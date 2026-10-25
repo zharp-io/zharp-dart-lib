@@ -1,0 +1,4 @@
+# Develop against the zharp_logs next door, not the published one.
+dependency_overrides:
+  zharp_logs:
+    path: ../zharp_logs
