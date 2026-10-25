@@ -1,6 +1,6 @@
 name: zharp_logs
-description: Send your Dart and Flutter app's logs to Zharp. Batched, retried, and small — works on servers, CLIs, mobile, desktop and the web.
-version: 0.1.0
+description: Send logs from Dart servers, CLIs and web apps to Zharp. Building a Flutter app? Use zharp_logs_flutter, which adds automatic crash capture.
+version: 0.1.1
 homepage: https://zharp.io
 repository: https://github.com/zharp-io/zharp-dart-lib/tree/main/packages/zharp_logs
 issue_tracker: https://github.com/zharp-io/zharp-dart-lib/issues
