@@ -150,6 +150,63 @@ void main() {
     });
   });
 
+  group('errors carry their stack without anyone passing it', () {
+    void chargeCard() => throw StateError('card declined');
+
+    test('error(e) with an Error: the stack it was thrown with', () async {
+      start();
+      try {
+        chargeCard();
+      } catch (e) {
+        ZharpLogger.error(e);
+      }
+      await ZharpLogger.flushAll();
+      final metadata = backend.logs.single['metadata'] as Map<String, dynamic>;
+      expect(backend.logs.single['message'], 'Bad state: card declined');
+      expect(metadata['name'], 'StateError');
+      expect(metadata['stack'], contains('chargeCard'));
+    });
+
+    test('error(e) with an Exception: where it was logged, starting in the caller', () async {
+      start();
+      try {
+        throw const FormatException('bad json');
+      } catch (e) {
+        ZharpLogger.error(e);
+      }
+      await ZharpLogger.flushAll();
+      final stack = (backend.logs.single['metadata'] as Map)['stack'] as String;
+      expect(stack, contains('zharp_logs_test.dart'));
+      expect(stack, isNot(contains('package:zharp_logs/')), reason: "the SDK's own frames are left out");
+    });
+
+    test("error('…', {'err': e}): the error as fields, and its stack as the log's", () async {
+      start();
+      try {
+        chargeCard();
+      } catch (e) {
+        ZharpLogger.error('Payment failed', {'err': e, 'orderId': 99});
+      }
+      await ZharpLogger.flushAll();
+      final metadata = backend.logs.single['metadata'] as Map<String, dynamic>;
+      expect(metadata['orderId'], 99);
+      final err = metadata['err'] as Map<String, dynamic>;
+      expect(err['name'], 'StateError');
+      expect(err['message'], 'Bad state: card declined');
+      expect(err['stack'], contains('chargeCard'));
+      expect(metadata['stack'], contains('chargeCard'));
+    });
+
+    test('a stack the caller gave is kept, and plain logs get none', () async {
+      start();
+      ZharpLogger.error('explicit', {'stack': 'my own stack'});
+      ZharpLogger.info('plain', {'a': 1});
+      await ZharpLogger.flushAll();
+      expect((backend.logs.first['metadata'] as Map)['stack'], 'my own stack');
+      expect((backend.logs.last['metadata'] as Map).containsKey('stack'), isFalse);
+    });
+  });
+
   group('delivery', () {
     test('info waits for the timer; error goes at once', () async {
       ZharpLogger.init(apiKey: 'k', service: 's', httpClient: backend.client, flushInterval: const Duration(seconds: 30));

@@ -30,6 +30,25 @@ Map<String, Object?> toJsonMap(Map<String, Object?>? metadata) {
   return (jsonDecode(encoded) as Map).cast<String, Object?>();
 }
 
+/// An error as plain fields: its type, its text, and — for an `Error` — where it was thrown.
+Map<String, Object?> errorFields(Object error) => {
+      'name': error.runtimeType.toString(),
+      'message': error.toString(),
+      if (error is Error && error.stackTrace != null) 'stack': error.stackTrace.toString(),
+    };
+
+/// The stack an error log should carry, found without the caller passing one: an `Error`'s own
+/// (where it was thrown), else — an `Exception` carries none — where it was logged, starting at
+/// the caller's code rather than inside this package.
+String stackFor(Object error) {
+  if (error is Error && error.stackTrace != null) return error.stackTrace.toString();
+  return StackTrace.current
+      .toString()
+      .split('\n')
+      .where((frame) => !frame.contains('package:zharp_logs/') && !frame.contains('package:zharp_logs_flutter/'))
+      .join('\n');
+}
+
 String? _encode(Object value) {
   try {
     return jsonEncode(value, toEncodable: _toEncodable);
@@ -39,6 +58,8 @@ String? _encode(Object value) {
 }
 
 Object? _toEncodable(Object? value) {
+  // An error as its type, text and (for an Error) the stack it was thrown with — not just text.
+  if (value is Error || value is Exception) return errorFields(value!);
   if (value is DateTime) return value.toUtc().toIso8601String();
   if (value is Duration) return value.inMilliseconds;
   if (value is Uri) return value.toString();

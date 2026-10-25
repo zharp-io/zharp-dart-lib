@@ -138,6 +138,14 @@ abstract final class ZharpLogger {
   static void log(LogLevel level, Object? message, {Map<String, Object?>? metadata, String? service}) {
     final setup = _setup;
     if (setup == null) return;
+    // An error logged as the message, or in the metadata, brings its stack with it — nobody has
+    // to pass one. A stack the caller gave wins.
+    if (metadata == null || !metadata.containsKey('stack')) {
+      final error = _isError(message) ? message : metadata?.values.where(_isError).firstOrNull;
+      if (error != null) {
+        metadata = {'name': error.runtimeType.toString(), 'stack': stackFor(error), ...?metadata};
+      }
+    }
     setup.push(_entry(setup, level, message, metadata, service));
     if (level == LogLevel.error || level == LogLevel.fatal) unawaited(setup.flush());
   }
@@ -253,6 +261,8 @@ abstract final class ZharpLogger {
       },
     };
   }
+
+  static bool _isError(Object? value) => value is Error || value is Exception;
 
   static String _uuid() {
     final random = Random.secure();

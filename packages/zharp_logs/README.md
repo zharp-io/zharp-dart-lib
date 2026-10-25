@@ -94,8 +94,20 @@ ZharpLogger.warn('Slow network detected', {'latencyMs': 3200});
 ZharpLogger.error('Payment failed', {'orderId': 99, 'reason': 'insufficient_funds'});
 ```
 
-`debug` and `fatal` are there too. The map is optional and is kept with the log. For a caught
-error with its stack:
+`debug` and `fatal` are there too. The map is optional and is kept with the log. A caught error
+can be logged as it is — its stack goes with it:
+
+```dart
+try {
+  await charge(order);
+} catch (e) {
+  ZharpLogger.error(e);                               // message, type and stack
+  ZharpLogger.error('Payment failed', {'err': e});    // or with your own message
+}
+```
+
+For the exact stack of an `Exception` (which, unlike an `Error`, doesn't carry one), pass the one
+`catch` gives you:
 
 ```dart
 try {

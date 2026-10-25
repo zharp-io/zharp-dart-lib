@@ -73,13 +73,15 @@ ZharpLogger.warn('Slow network detected', {'latencyMs': 3200});
 ZharpLogger.error('Payment failed', {'orderId': 99});
 ```
 
-`debug` and `fatal` are there too. For an error you caught, with its stack:
+`debug` and `fatal` are there too. An error you caught can be logged as it is — its stack goes
+with it:
 
 ```dart
 try {
   await checkout();
-} catch (e, stack) {
-  ZharpLogger.captureException(e, stack, metadata: {'step': 'checkout'});
+} catch (e) {
+  ZharpLogger.error(e);                             // message, type and stack
+  ZharpLogger.error('Checkout failed', {'err': e});  // or with your own message
 }
 ```
 
