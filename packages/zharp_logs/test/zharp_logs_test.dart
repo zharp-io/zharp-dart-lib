@@ -290,6 +290,42 @@ void main() {
       expect(calls, 3);
     });
 
+    test('a rejected key warns once and stops sending; one batch is tried after the wait', () async {
+      final statuses = [401, 401, 202, 202];
+      final sent = <String>[];
+      final client = MockClient((request) async {
+        sent.add((jsonDecode(request.body)['logs'] as List).single['message'] as String);
+        return http.Response('{}', statuses[sent.length - 1]);
+      });
+      final transport = Transport(
+        apiKey: 'k',
+        endpoint: 'https://x',
+        client: client,
+        retryDelay: const Duration(milliseconds: 1),
+        keyRetryDelay: const Duration(milliseconds: 100),
+      );
+      final printed = <String>[];
+      await runZoned(
+        () async {
+          Future<void> send(String message) => transport.send([{'message': message}]);
+          await send('first'); // 401: one warning, not retried
+          await send('backed-off'); // dropped without a request
+          await Future<void>.delayed(const Duration(milliseconds: 120));
+          await send('after-wait'); // the one try: 401 again, no second warning
+          await send('backed-off-again');
+          await Future<void>.delayed(const Duration(milliseconds: 120));
+          await send('accepted'); // 202: sending resumes, said once
+          await send('flowing');
+        },
+        zoneSpecification: ZoneSpecification(print: (_, __, ___, line) => printed.add(line)),
+      );
+      expect(sent, ['first', 'after-wait', 'accepted', 'flowing']);
+      expect(printed, [
+        '[Zharp] Zharp rejected this API key (HTTP 401) — logs are not being sent. Check ZHARP_API_KEY.',
+        '[Zharp] Zharp accepted the API key again — logs are being sent.',
+      ]);
+    });
+
     test('bodies are cut by bytes; an oversized entry still goes alone', () {
       final big = {'message': 'x' * 600};
       final bodies = splitBySize([big, big, big], 1300);
