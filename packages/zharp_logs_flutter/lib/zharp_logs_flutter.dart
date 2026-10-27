@@ -28,7 +28,7 @@ export 'package:zharp_logs/zharp_logs.dart';
 /// Starts [ZharpLogger] for a Flutter app, with Flutter's error and lifecycle hooks.
 abstract final class ZharpFlutter {
   /// This package's version.
-  static const String version = '0.1.0';
+  static const String version = '0.1.1';
 
   static FlutterExceptionHandler? _previousFlutterError;
   static ErrorCallback? _previousPlatformError;

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'env.dart';
 import 'version.dart';
 
 /// Where logs go unless `endpoint` says otherwise.
@@ -25,6 +26,7 @@ class Transport {
     required this.client,
     this.retryDelay = const Duration(seconds: 1),
     this.timeout = const Duration(seconds: 15),
+    this.keyRetryDelay = const Duration(hours: 1),
   });
 
   final String apiKey;
@@ -35,6 +37,20 @@ class Transport {
   final Duration retryDelay;
   final Duration timeout;
 
+  /// How long a rejected key waits before one batch is tried again.
+  final Duration keyRetryDelay;
+
+  /// While Zharp rejects the key (401/403): when the next batch may go out. Null while accepted.
+  ///
+  /// A deleted or revoked key stays rejected, so sending every batch would only be refused
+  /// forever. The first rejection prints one warning; after that batches are dropped, not kept,
+  /// so memory stays bounded, until [keyRetryDelay] has passed and one batch is tried again. If
+  /// it is accepted, sending resumes and says so once; if not, the next try is a wait later.
+  DateTime? _retryAt;
+
+  /// The one batch tried after the wait is in flight.
+  bool _probing = false;
+
   Future<void> send(List<Map<String, Object?>> entries) async {
     // Cut by bytes rather than count: fifty entries carrying stack traces can be megabytes, and
     // one oversized request would be rejected whole.
@@ -44,8 +60,10 @@ class Transport {
   }
 
   /// Three attempts in all. Only network errors and 5xx responses are retried — a 4xx won't be
-  /// fixed by sending the same thing again.
+  /// fixed by sending the same thing again. A rejected key (401/403) stops sending altogether for
+  /// a while: see [_retryAt].
   Future<void> _sendBody(String body) async {
+    if (!_allow()) return;
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
         final response = await client
@@ -56,12 +74,53 @@ class Transport {
               body: body,
             )
             .timeout(timeout);
+        if (_rejected(response.statusCode)) return;
         if (response.statusCode < 500) return;
       } catch (_) {
         // Network failure or timeout — fall through to retry.
+        _failed();
       }
       if (attempt < 2) await Future<void>.delayed(retryDelay * (2 << attempt));
     }
+  }
+
+  /// Whether a batch may go out now: always while the key is accepted, then one per wait.
+  bool _allow() {
+    final retryAt = _retryAt;
+    if (retryAt == null) return true;
+    if (_probing || DateTime.now().isBefore(retryAt)) return false;
+    _probing = true;
+    return true;
+  }
+
+  /// Notes a response; true when the key was rejected, so the batch is dropped, not retried.
+  bool _rejected(int status) {
+    final wasBackedOff = _retryAt != null;
+    _probing = false;
+    if (status == 401 || status == 403) {
+      if (!wasBackedOff) {
+        announce('Zharp rejected this API key (HTTP $status) — logs are not being sent. Check ZHARP_API_KEY.');
+      }
+      _retryAt = DateTime.now().add(keyRetryDelay);
+      return true;
+    }
+    if (wasBackedOff) {
+      if (status >= 200 && status < 300) {
+        _retryAt = null;
+        announce('Zharp accepted the API key again — logs are being sent.');
+      } else {
+        // Neither accepted nor rejected (a server error): try again after the next wait.
+        _retryAt = DateTime.now().add(keyRetryDelay);
+      }
+    }
+    return false;
+  }
+
+  /// The tried batch never got a response: wait again rather than stay stuck mid-try.
+  void _failed() {
+    if (!_probing) return;
+    _probing = false;
+    _retryAt = DateTime.now().add(keyRetryDelay);
   }
 }
 

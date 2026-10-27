@@ -1,5 +1,5 @@
 /// This package's version.
-const String version = '0.1.2';
+const String version = '0.1.3';
 
 /// What requests from this SDK say they are, in the `X-Zharp-SDK` header, e.g. `dart-logs/0.1.1`.
 ///

@@ -1,6 +1,6 @@
 name: zharp_logs_flutter
 description: Send your Flutter app's logs and crashes to Zharp. Captures Flutter and async errors automatically, and sends what's queued when the app goes to the background.
-version: 0.1.0
+version: 0.1.1
 homepage: https://zharp.io
 repository: https://github.com/zharp-io/zharp-dart-lib/tree/main/packages/zharp_logs_flutter
 issue_tracker: https://github.com/zharp-io/zharp-dart-lib/issues
@@ -14,7 +14,7 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.2.0
-  zharp_logs: ^0.1.0
+  zharp_logs: ^0.1.3
 
 dev_dependencies:
   flutter_lints: ^4.0.0
