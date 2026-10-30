@@ -43,10 +43,12 @@ class ZharpCore {
   /// Start the SDK and make it [instance], replacing (and flushing) one already running.
   ///
   /// [resourceAttributes] are added to the resource — the device, OS and app context a platform
-  /// integration knows. Returns null when [ZharpOptions.enabled] is false or the key is missing.
+  /// integration knows. [defaultRelease] is used when the options set no release (the app's
+  /// version, as the platform reports it). Returns null when [ZharpOptions.enabled] is false or the key is missing.
   static ZharpCore? start(
     ZharpOptions options, {
     Map<String, Object?> resourceAttributes = const {},
+    String? defaultRelease,
     DateTime Function()? clock,
   }) {
     final previous = _instance;
@@ -67,7 +69,8 @@ class ZharpCore {
       ...platformAttributes(),
       ...sanitizeAttributes(resourceAttributes),
       'service.name': _nonBlank(options.service) ?? 'unknown_service:dart',
-      if (_nonBlank(options.release) != null) 'service.version': _nonBlank(options.release)!,
+      if ((_nonBlank(options.release) ?? _nonBlank(defaultRelease)) != null)
+        'service.version': (_nonBlank(options.release) ?? _nonBlank(defaultRelease))!,
       if (_nonBlank(options.environment) != null) 'deployment.environment.name': _nonBlank(options.environment)!,
       'telemetry.sdk.name': 'zharp',
       'telemetry.sdk.language': 'dart',
@@ -126,6 +129,24 @@ class ZharpCore {
   int get pending => _exporter.pending;
 
   ZharpUser? get user => _user;
+
+  /// Add context a platform learns after start — device details from native code — to the
+  /// resource. Batches sent from now on carry it. What the options set (service, environment,
+  /// release) and the SDK's own attributes are kept; [defaultRelease] applies only when the
+  /// options set no release.
+  void updateResource(Map<String, Object?> attributes, {String? defaultRelease}) {
+    _guard(() {
+      final clean = sanitizeAttributes(attributes)
+        ..removeWhere((key, _) =>
+            key == 'service.name' ||
+            key == 'service.version' ||
+            key.startsWith('deployment.environment') ||
+            key.startsWith('telemetry.sdk.'));
+      resource.addAll(clean);
+      final release = _nonBlank(defaultRelease);
+      if (_nonBlank(options.release) == null && release != null) resource['service.version'] = release;
+    });
+  }
 
   // ─── Context ───────────────────────────────────────────────────────────────
 

@@ -1,0 +1,19 @@
+name: zharp_dio
+description: Traces Dio requests for Zharp Application Monitoring — a CLIENT span per request, and trace headers to your own back end. Use with zharp_flutter.
+version: 0.1.0
+homepage: https://zharp.io
+repository: https://github.com/zharp-io/zharp-dart-lib/tree/main/packages/zharp_dio
+issue_tracker: https://github.com/zharp-io/zharp-dart-lib/issues
+documentation: https://zharp.io/docs/sdks/flutter
+
+environment:
+  sdk: ^3.3.0
+
+dependencies:
+  dio: ^5.0.0
+  zharp_core: ^0.1.0
+
+dev_dependencies:
+  http: ^1.2.0
+  lints: ^4.0.0
+  test: ^1.25.0

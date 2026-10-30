@@ -51,6 +51,17 @@ void main() {
     });
   });
 
+  test('updateResource adds late device context; options keep priority', () async {
+    final zharp = start();
+    zharp.updateResource({'device.model.name': 'Pixel 8', 'service.name': 'nope'}, defaultRelease: 'app@9');
+    zharp.log.info('x');
+    await zharp.flush();
+    final resource = backend.resourceOf(backend.requests.single);
+    expect(resource['device.model.name'], 'Pixel 8');
+    expect(resource['service.name'], 'shop-app');
+    expect(resource['service.version'], 'shop@1.2.0');
+  });
+
   group('logs', () {
     test('carry severity, body, attributes, the session, user and tags', () async {
       final zharp = start();
@@ -194,8 +205,8 @@ void main() {
 
     test('an idle (screen) span waits for its requests, then ends at the last one', () {
       fakeAsync((async) {
-        final zharp = start();
-        final start0 = DateTime.now();
+        final base = DateTime.utc(2026);
+        final zharp = start(clock: () => base.add(async.elapsed));
         final screen = zharp.tracer.startIdle('screen /cart',
             idleTimeout: const Duration(seconds: 1), maxDuration: const Duration(seconds: 30));
         final release = screen.hold();
@@ -212,7 +223,6 @@ void main() {
         expect(screen.span.isEnded, isTrue);
         // Ends when the request did, not after the idle wait.
         expect(screen.span.endMicros, request.endMicros);
-        expect(start0, isNotNull);
         // After it ended, new work starts its own trace.
         expect(zharp.tracer.start('later').parentSpanId, isNull);
       });

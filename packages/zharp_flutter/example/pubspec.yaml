@@ -1,0 +1,20 @@
+name: zharp_flutter_example
+description: Shows zharp_flutter — errors, logs, screen views and traced requests.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.3.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  zharp_flutter:
+    path: ../
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

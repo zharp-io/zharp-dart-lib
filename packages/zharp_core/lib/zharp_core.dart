@@ -12,6 +12,7 @@
 library;
 
 export 'src/core.dart' show ZharpCore, ZharpLog, ZharpUser, normalizeEndpoint;
+export 'src/ids.dart' show newUuid;
 export 'src/errors.dart' show ExceptionDescription, describeError, markReported, wasReported;
 export 'src/http_tracing.dart' show HttpSpan, ZharpHttpClient, redactUrl, startHttpSpan;
 export 'src/options.dart' show ZharpOptions, defaultEndpoint;

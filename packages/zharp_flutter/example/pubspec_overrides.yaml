@@ -1,0 +1,3 @@
+dependency_overrides:
+  zharp_core:
+    path: ../../zharp_core
