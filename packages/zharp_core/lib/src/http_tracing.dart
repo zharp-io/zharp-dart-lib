@@ -63,11 +63,11 @@ class HttpSpan {
 }
 
 /// Start a CLIENT span for a request, under the current span. Null when the SDK isn't running or
-/// [url] is Zharp's own endpoint. [existingHeaders] are the request's headers: a `traceparent`
+/// [url] is Zharp's own endpoint, or when `tracing` is off (logs-only mode). [existingHeaders] are the request's headers: a `traceparent`
 /// already there is left alone and `baggage` is merged with.
 HttpSpan? startHttpSpan(String method, Uri url, {Map<String, String> existingHeaders = const {}}) {
   final core = ZharpCore.instance;
-  if (core == null) return null;
+  if (core == null || !core.options.tracing) return null;
   try {
     if (core.isOwnEndpoint(url)) return null;
     final verb = method.toUpperCase();

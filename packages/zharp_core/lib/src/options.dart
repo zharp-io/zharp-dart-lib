@@ -11,6 +11,7 @@ class ZharpOptions {
     this.environment,
     this.release,
     this.endpoint,
+    this.tracing = true,
     this.tracingOrigins = const [],
     this.sampleRate = 1.0,
     this.enabled = true,
@@ -42,6 +43,12 @@ class ZharpOptions {
 
   /// The OTLP endpoint. Defaults to [defaultEndpoint]; `/v1/traces` and `/v1/logs` are appended.
   final String? endpoint;
+
+  /// False is logs-only mode: logs, errors (uncaught and `captureError`), the user, session,
+  /// screen and tags are still sent, but no spans are created or exported — no screen-view
+  /// spans, no HTTP client spans (`ZharpHttpClient`, `zharp_dio`), and no `traceparent` or
+  /// `baggage` added to outgoing requests. `startSpan` still runs its callback. Defaults to true.
+  final bool tracing;
 
   /// Hosts whose requests carry `traceparent` and `baggage`, so your back end continues the
   /// app's traces: `'api.example.com'`, `'*.example.com'`, `'https://api.example.com:8443'`, or

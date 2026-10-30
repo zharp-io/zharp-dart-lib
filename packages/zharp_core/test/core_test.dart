@@ -14,7 +14,11 @@ void main() {
   setUp(() => backend = FakeBackend());
   tearDown(() async => ZharpCore.instance?.close());
 
-  ZharpCore start({List<Pattern> tracingOrigins = const [], double sampleRate = 1.0, DateTime Function()? clock}) =>
+  ZharpCore start(
+          {List<Pattern> tracingOrigins = const [],
+          double sampleRate = 1.0,
+          bool tracing = true,
+          DateTime Function()? clock}) =>
       ZharpCore.start(
           clock: clock,
           ZharpOptions(
@@ -25,6 +29,7 @@ void main() {
             endpoint: 'https://ingest.test/api/v1/otlp/',
             tracingOrigins: tracingOrigins,
             sampleRate: sampleRate,
+            tracing: tracing,
             httpClient: backend.client,
           ))!;
 
@@ -159,6 +164,56 @@ void main() {
       zharp.log.error(const FormatException('bad json'));
       await zharp.flush();
       expect(attrs(backend.logs.single['attributes'] as List)['exception.type'], 'FormatException');
+    });
+  });
+
+  group('tracing: false (logs only)', () {
+    test('no spans; startSpan still runs; logs and errors still sent with context', () async {
+      final zharp = start(tracing: false, tracingOrigins: ['api.shop.test']);
+      zharp.setUser(id: 'u-7');
+      zharp.setTag('plan', 'pro');
+      final result = await zharp.startSpan('checkout', (span) async {
+        span.setAttribute('ignored', 1);
+        zharp.log.info('inside');
+        try {
+          throw StateError('declined');
+        } catch (e, st) {
+          zharp.captureError(e, stackTrace: st);
+        }
+        return 42;
+      });
+      expect(result, 42);
+      zharp.captureError(ArgumentError('boom'), handled: false);
+      zharp.tracer.start('direct').end();
+      await zharp.flush();
+
+      expect(backend.to('traces'), isEmpty);
+      expect(backend.logs, hasLength(3));
+      final inside = backend.logs.first;
+      expect(inside.containsKey('traceId'), isFalse);
+      final a = attrs(inside['attributes'] as List);
+      expect(a, containsPair('enduser.id', 'u-7'));
+      expect(a, containsPair('plan', 'pro'));
+      expect(a['session.id'], zharp.session.id);
+      final handled = attrs(backend.logs[1]['attributes'] as List);
+      expect(handled['exception.type'], 'StateError');
+      expect(handled['zharp.handled'], 'true');
+      expect(attrs(backend.logs[2]['attributes'] as List)['zharp.handled'], 'false');
+    });
+
+    test('ZharpHttpClient: no CLIENT span and no traceparent/baggage, even for tracingOrigins', () async {
+      final zharp = start(tracing: false, tracingOrigins: ['api.shop.test']);
+      final seen = <http.BaseRequest>[];
+      final client = ZharpHttpClient(MockClient((request) async {
+        seen.add(request);
+        return http.Response('{}', 200);
+      }));
+      await client.get(Uri.parse('https://api.shop.test/orders'));
+      expect(startHttpSpan('GET', Uri.parse('https://api.shop.test/orders')), isNull);
+      await zharp.flush();
+      expect(seen.single.headers.containsKey('traceparent'), isFalse);
+      expect(seen.single.headers.containsKey('baggage'), isFalse);
+      expect(backend.to('traces'), isEmpty);
     });
   });
 

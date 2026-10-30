@@ -12,7 +12,8 @@ import 'package:zharp_core/zharp_core.dart';
 ///
 /// The span lasts while the screen loads: until its first frame is drawn and the requests made
 /// meanwhile have finished (then `screenIdleTimeout` without new ones; at most
-/// `screenMaxDuration`). Requests made then join its trace.
+/// `screenMaxDuration`). Requests made then join its trace. With `tracing: false` only the screen
+/// name is kept (on logs and errors); no span is recorded.
 ///
 /// Routes are named by their `RouteSettings.name` (`Navigator.pushNamed`, go_router's paths).
 /// Unnamed routes are skipped unless [nameExtractor] names them. Only page routes count by
@@ -45,6 +46,8 @@ class ZharpNavigatorObserver extends NavigatorObserver {
       final fromName = from != null && _isScreen(from) ? _nameOf(from) : null;
       // On pop the route underneath was the screen all along; only the name it shows changes.
       core.setScreen(name);
+      // Logs-only mode: the screen name still tags logs and errors; no screen-view span.
+      if (!core.options.tracing) return;
       final view = core.tracer.startIdle(
         'screen $name',
         idleTimeout: core.options.screenIdleTimeout,

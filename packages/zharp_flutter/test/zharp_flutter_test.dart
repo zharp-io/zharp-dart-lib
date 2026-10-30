@@ -62,13 +62,18 @@ void main() {
         };
       });
 
-  ZharpOptions options({String? release, bool captureErrors = true, List<Pattern> tracingOrigins = const []}) =>
+  ZharpOptions options(
+          {String? release,
+          bool captureErrors = true,
+          bool tracing = true,
+          List<Pattern> tracingOrigins = const []}) =>
       ZharpOptions(
         key: 'zpk_test',
         service: 'shop-app',
         environment: 'production',
         release: release,
         endpoint: 'https://ingest.test/api/v1/otlp',
+        tracing: tracing,
         tracingOrigins: tracingOrigins,
         captureErrors: captureErrors,
         httpClient: backend.client,
@@ -274,6 +279,43 @@ void main() {
 
       final log = backend.logs.single;
       expect(attrs(log['attributes'] as List)['app.screen.name'], '/cart');
+      await Zharp.close();
+    });
+
+    testWidgets('tracing: false — no screen or request spans, no trace headers; logs keep the screen',
+        (tester) async {
+      final seen = <http.BaseRequest>[];
+      final app = MockClient((request) async {
+        seen.add(request);
+        return http.Response('[]', 200);
+      });
+      await Zharp.init(options(tracing: false, tracingOrigins: ['api.shop.test']));
+      final api = ZharpHttpClient(app);
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(MaterialApp(
+        navigatorKey: navigator,
+        navigatorObservers: [ZharpNavigatorObserver()],
+        initialRoute: '/',
+        routes: {
+          '/': (_) => const Text('home'),
+          '/cart': (_) => _LoadsOnOpen(api),
+        },
+      ));
+      await tester.pump();
+      navigator.currentState!.pushNamed('/cart');
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 2));
+      Zharp.log.info('on cart');
+      Zharp.captureError(StateError('oops'));
+      expect(Zharp.startSpan('work', (_) => 5), 5);
+      await Zharp.flush();
+
+      expect(backend.spans, isEmpty);
+      expect(seen, isNotEmpty);
+      expect(seen.every((r) => !r.headers.containsKey('traceparent') && !r.headers.containsKey('baggage')), isTrue);
+      expect(backend.logs, hasLength(2));
+      expect(attrs(backend.logs.first['attributes'] as List)['app.screen.name'], '/cart');
+      expect(attrs(backend.logs.last['attributes'] as List)['exception.type'], 'StateError');
       await Zharp.close();
     });
 

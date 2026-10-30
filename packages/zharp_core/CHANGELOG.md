@@ -4,3 +4,4 @@
   OTLP/HTTP JSON (gzipped), batched, retried with backoff, buffered in memory while offline;
   sessions; W3C `traceparent` + `baggage` for the hosts in `tracingOrigins`; `ZharpHttpClient`
   for `package:http`.
+- `ZharpOptions(tracing: false)`: logs only — no spans, no trace headers; logs and errors still sent.

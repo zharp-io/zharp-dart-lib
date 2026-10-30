@@ -17,6 +17,9 @@ await zharp.startSpan('import', (span) async { /* … */ });
 await zharp.close();
 ```
 
+Logs only — no spans, no trace headers on requests, `startSpan` just runs its callback:
+`ZharpOptions(key: 'zpk_…', tracing: false)`.
+
 ## Develop
 
 ```bash

@@ -108,4 +108,26 @@ void main() {
     expect(response.statusCode, 200);
     expect(adapter.seen.single.headers.containsKey('traceparent'), isFalse);
   });
+
+  test('tracing: false — no span and no trace headers; the request still goes through', () async {
+    await ZharpCore.instance!.close();
+    ZharpCore.start(ZharpOptions(
+      key: 'zpk_test',
+      endpoint: 'https://ingest.test/api/v1/otlp',
+      tracing: false,
+      tracingOrigins: ['api.shop.test'],
+      httpClient: MockClient((request) async {
+        sent.add(request);
+        return http.Response('{}', 200);
+      }),
+    ));
+    final response = await dio.get<dynamic>('https://api.shop.test/orders');
+    expect(response.statusCode, 200);
+    ZharpCore.instance!.log.info('still logged');
+    await ZharpCore.instance!.flush();
+    expect(adapter.seen.single.headers.containsKey('traceparent'), isFalse);
+    expect(adapter.seen.single.headers.containsKey('baggage'), isFalse);
+    expect(spans(), isEmpty);
+    expect(sent.where((r) => r.url.path.endsWith('/v1/logs')), hasLength(1));
+  });
 }

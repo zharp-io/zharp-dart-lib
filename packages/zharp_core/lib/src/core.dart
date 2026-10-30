@@ -28,7 +28,8 @@ class ZharpUser {
 class ZharpCore {
   ZharpCore._(this.options, this.resource, this._exporter, this.session, this._ownsClient, this._clock) {
     tracer = Tracer(
-      sampleRate: options.sampleRate.clamp(0.0, 1.0).toDouble(),
+      // Logs-only mode: nothing that reaches the tracer directly is exported either.
+      sampleRate: options.tracing ? options.sampleRate.clamp(0.0, 1.0).toDouble() : 0.0,
       contextAttributes: () => contextAttributes(),
       export: (span) => _exporter.addSpan(span.toData()),
       clock: _clock,
@@ -246,6 +247,8 @@ class ZharpCore {
     Map<String, Object?>? attributes,
     SpanKind kind = SpanKind.internal,
   }) {
+    // Logs-only mode: the callback runs, no span is made.
+    if (!options.tracing) return body(_noopSpan(name));
     final ZharpSpan span;
     try {
       span = tracer.start(name, kind: kind, attributes: attributes);
@@ -292,7 +295,7 @@ class ZharpCore {
   /// empty map when [url] isn't in `tracingOrigins` or is Zharp's own endpoint.
   Map<String, String> propagationHeaders(Uri url, ZharpSpan span, {String? existingBaggage}) {
     try {
-      if (isOwnEndpoint(url) || !shouldPropagate(url, options.tracingOrigins)) return const {};
+      if (!options.tracing || isOwnEndpoint(url) || !shouldPropagate(url, options.tracingOrigins)) return const {};
       final baggage = mergeBaggage(existingBaggage, {
         'session.id': session.id,
         'enduser.id': _user?.id,

@@ -52,6 +52,19 @@ Telemetry is batched (every 5 s or 100 records), gzipped, retried with backoff, 
 (capped) while offline, and sent when the app goes to the background. The SDK never throws into
 your app; it prints one warning if the key is rejected (`debug: true` prints more).
 
+## Logs only
+
+Don't want tracing? Turn it off and keep logs, errors, users, sessions, screen names and tags:
+
+```dart
+await Zharp.init(ZharpOptions(key: 'zpk_…', service: 'shop-app', tracing: false));
+```
+
+With `tracing: false` no spans are created or sent: no screen-view spans, no HTTP spans from
+`ZharpHttpClient` or `zharp_dio`, and no `traceparent`/`baggage` on outgoing requests (so
+`tracingOrigins` has no effect). `Zharp.startSpan` still runs its callback. `ZharpNavigatorObserver`
+still sets `app.screen.name` on logs and errors.
+
 ## Options
 
 | Option | Default | |
@@ -59,6 +72,7 @@ your app; it prints one warning if the key is rejected (`debug: true` prints mor
 | `key` | — | Required. |
 | `service`, `environment`, `release` | | `service.name`, `deployment.environment.name`, `service.version` |
 | `endpoint` | `https://api.zharp.io/api/v1/otlp` | |
+| `tracing` | `true` | `false` = logs only (see above) |
 | `tracingOrigins` | `[]` | Hosts (`api.example.com`, `*.example.com`), origins, or `RegExp`s |
 | `sampleRate` | `1.0` | Share of traces kept; errors and logs are always sent |
 | `enabled` | `true` | e.g. `enabled: kReleaseMode` |
