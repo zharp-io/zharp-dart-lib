@@ -229,7 +229,8 @@ class ZharpCore {
   /// every frame — is skipped.
   bool _isRepeat(ExceptionDescription exception) {
     final now = _clock();
-    final key = exception.stacktrace.split('\n').take(2).join('\n');
+    // The error's first line and its first frame (not an obfuscated stack's header lines).
+    final key = '${exception.stacktrace.split('\n').first}\n${exception.firstFrame}';
     _recentErrors.removeWhere((_, at) => now.difference(at) > const Duration(seconds: 1));
     if (_recentErrors.containsKey(key)) return true;
     if (_recentErrors.length < 100) _recentErrors[key] = now;

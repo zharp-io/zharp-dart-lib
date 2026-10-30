@@ -4,3 +4,5 @@
   platform and zone errors, `captureError`, `Zharp.log`, sessions, device context, screen views
   (`ZharpNavigatorObserver`), traced HTTP (`ZharpHttpClient`; Dio via `zharp_dio`), flush on pause.
 - `ZharpOptions(tracing: false)`: logs only — no screen-view or HTTP spans, no trace headers.
+- Readable stacks from obfuscated builds: see "Readable stack traces from obfuscated builds" in
+  the README (`npx @zharp/cli dart-symbols upload build/symbols --app <id>`).

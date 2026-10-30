@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds send to Zharp too (e.g. an obfuscated build, to check readable stacks). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="zharp_flutter_example"
         android:name="${applicationName}"

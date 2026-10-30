@@ -1,0 +1,293 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "os.name",
+            "value": {
+              "stringValue": "Android"
+            }
+          },
+          {
+            "key": "os.version",
+            "value": {
+              "stringValue": "16"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "zharp-flutter-smoke"
+            }
+          },
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "smoke"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "zharp"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "dart"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "0.1.0"
+            }
+          },
+          {
+            "key": "device.model.identifier",
+            "value": {
+              "stringValue": "sdk_gphone64_x86_64"
+            }
+          },
+          {
+            "key": "device.model.name",
+            "value": {
+              "stringValue": "Google sdk_gphone64_x86_64"
+            }
+          },
+          {
+            "key": "device.manufacturer",
+            "value": {
+              "stringValue": "Google"
+            }
+          },
+          {
+            "key": "device.id",
+            "value": {
+              "stringValue": "fec614ed-e476-4858-970e-686c4d238578"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "io.zharp.zharp_flutter_example@1.0.0+1"
+            }
+          }
+        ]
+      },
+      "scopeLogs": [
+        {
+          "scope": {
+            "name": "zharp",
+            "version": "0.1.0"
+          },
+          "logRecords": [
+            {
+              "timeUnixNano": "1793401275041096000",
+              "observedTimeUnixNano": "1793401275041096000",
+              "severityNumber": 9,
+              "severityText": "INFO",
+              "body": {
+                "stringValue": "Smoke log"
+              },
+              "attributes": [
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "2ce0de7d-7e5e-4c5a-9e53-fe0a48b6fc89"
+                  }
+                },
+                {
+                  "key": "enduser.id",
+                  "value": {
+                    "stringValue": "smoke-user"
+                  }
+                },
+                {
+                  "key": "enduser.email",
+                  "value": {
+                    "stringValue": "smoke@zharp.test"
+                  }
+                },
+                {
+                  "key": "app.screen.name",
+                  "value": {
+                    "stringValue": "/posts"
+                  }
+                },
+                {
+                  "key": "step",
+                  "value": {
+                    "stringValue": "after posts"
+                  }
+                }
+              ]
+            },
+            {
+              "timeUnixNano": "1793401275041756000",
+              "observedTimeUnixNano": "1793401275041756000",
+              "severityNumber": 17,
+              "severityText": "ERROR",
+              "body": {
+                "stringValue": "Bad state: smoke caught error"
+              },
+              "attributes": [
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "2ce0de7d-7e5e-4c5a-9e53-fe0a48b6fc89"
+                  }
+                },
+                {
+                  "key": "enduser.id",
+                  "value": {
+                    "stringValue": "smoke-user"
+                  }
+                },
+                {
+                  "key": "enduser.email",
+                  "value": {
+                    "stringValue": "smoke@zharp.test"
+                  }
+                },
+                {
+                  "key": "app.screen.name",
+                  "value": {
+                    "stringValue": "/posts"
+                  }
+                },
+                {
+                  "key": "exception.type",
+                  "value": {
+                    "stringValue": "StateError"
+                  }
+                },
+                {
+                  "key": "exception.message",
+                  "value": {
+                    "stringValue": "Bad state: smoke caught error"
+                  }
+                },
+                {
+                  "key": "exception.stacktrace",
+                  "value": {
+                    "stringValue": "StateError: Bad state: smoke caught error\n*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***\npid: 4909, tid: 127519851700304, name 1.ui\nos: android arch: x64 comp: yes sim: no\nbuild_id: '838fce00662e5c72cc7484da9007706e'\nisolate_dso_base: 73f72cad9000, vm_dso_base: 73f72cad9000\nisolate_instructions: 73f72cbaef40, vm_instructions: 73f72cb99000\n    #00 abs 000073f72cdc19df virt 00000000002e89df _kDartIsolateSnapshotInstructions+0x212a9f\n<asynchronous suspension>"
+                  }
+                },
+                {
+                  "key": "zharp.handled",
+                  "value": {
+                    "stringValue": "true"
+                  }
+                },
+                {
+                  "key": "zharp.dart_build_id",
+                  "value": {
+                    "stringValue": "838fce00662e5c72cc7484da9007706e"
+                  }
+                },
+                {
+                  "key": "zharp.dart_os",
+                  "value": {
+                    "stringValue": "android"
+                  }
+                },
+                {
+                  "key": "zharp.dart_arch",
+                  "value": {
+                    "stringValue": "x64"
+                  }
+                }
+              ]
+            },
+            {
+              "timeUnixNano": "1793401275045833000",
+              "observedTimeUnixNano": "1793401275045833000",
+              "severityNumber": 17,
+              "severityText": "ERROR",
+              "body": {
+                "stringValue": "Bad state: smoke uncaught error"
+              },
+              "attributes": [
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "2ce0de7d-7e5e-4c5a-9e53-fe0a48b6fc89"
+                  }
+                },
+                {
+                  "key": "enduser.id",
+                  "value": {
+                    "stringValue": "smoke-user"
+                  }
+                },
+                {
+                  "key": "enduser.email",
+                  "value": {
+                    "stringValue": "smoke@zharp.test"
+                  }
+                },
+                {
+                  "key": "app.screen.name",
+                  "value": {
+                    "stringValue": "/posts"
+                  }
+                },
+                {
+                  "key": "zharp.mechanism",
+                  "value": {
+                    "stringValue": "PlatformDispatcher"
+                  }
+                },
+                {
+                  "key": "exception.type",
+                  "value": {
+                    "stringValue": "StateError"
+                  }
+                },
+                {
+                  "key": "exception.message",
+                  "value": {
+                    "stringValue": "Bad state: smoke uncaught error"
+                  }
+                },
+                {
+                  "key": "exception.stacktrace",
+                  "value": {
+                    "stringValue": "StateError: Bad state: smoke uncaught error\n*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***\npid: 4909, tid: 127519851700304, name 1.ui\nos: android arch: x64 comp: yes sim: no\nbuild_id: '838fce00662e5c72cc7484da9007706e'\nisolate_dso_base: 73f72cad9000, vm_dso_base: 73f72cad9000\nisolate_instructions: 73f72cbaef40, vm_instructions: 73f72cb99000\n    #00 abs 000073f72cd8ea15 virt 00000000002b5a15 _kDartIsolateSnapshotInstructions+0x1dfad5\n    #01 abs 000073f72cbc5d30 virt 00000000000ecd30 _kDartIsolateSnapshotInstructions+0x16df0\n    #02 abs 000073f72cd93ba5 virt 00000000002baba5 _kDartIsolateSnapshotInstructions+0x1e4c65\n    #03 abs 000073f72cbc4869 virt 00000000000eb869 _kDartIsolateSnapshotInstructions+0x15929\n    #04 abs 000073f72cbc47f2 virt 00000000000eb7f2 _kDartIsolateSnapshotInstructions+0x158b2\n    #05 abs 000073f72cdca130 virt 00000000002f1130 _kDartIsolateSnapshotInstructions+0x21b1f0\n    #06 abs 000073f72cbc40c5 virt 00000000000eb0c5 _kDartIsolateSnapshotInstructions+0x15185"
+                  }
+                },
+                {
+                  "key": "zharp.handled",
+                  "value": {
+                    "stringValue": "false"
+                  }
+                },
+                {
+                  "key": "zharp.dart_build_id",
+                  "value": {
+                    "stringValue": "838fce00662e5c72cc7484da9007706e"
+                  }
+                },
+                {
+                  "key": "zharp.dart_os",
+                  "value": {
+                    "stringValue": "android"
+                  }
+                },
+                {
+                  "key": "zharp.dart_arch",
+                  "value": {
+                    "stringValue": "x64"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

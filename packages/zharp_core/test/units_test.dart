@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:test/test.dart';
 import 'package:zharp_core/src/errors.dart';
 import 'package:zharp_core/src/ids.dart';
@@ -205,6 +207,48 @@ void main() {
         caught = e;
       }
       expect(describeError(caught, null).stacktrace, contains('units_test.dart'));
+    });
+
+    group('obfuscated builds (--obfuscate --split-debug-info)', () {
+      // A real stack from the example app built that way (see test/fixtures/obfuscated).
+      final sent = File('test/fixtures/obfuscated/android-x64-uncaught.txt').readAsStringSync().trimRight();
+      final raw = sent.substring(sent.indexOf('\n') + 1);
+
+      test('the VM\'s stack is sent as it wrote it, header included', () {
+        final d = describeError(StateError('smoke uncaught error'), StackTrace.fromString('$raw\n'));
+        expect(d.stacktrace, sent);
+        expect(d.stacktrace.split('\n')[1], '*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***');
+        expect(d.stacktrace, contains("build_id: '838fce00662e5c72cc7484da9007706e'"));
+        expect(d.stacktrace, contains('isolate_dso_base: 73f72cad9000, vm_dso_base: 73f72cad9000'));
+        expect(d.stacktrace,
+            contains('    #00 abs 000073f72cd8ea15 virt 00000000002b5a15 _kDartIsolateSnapshotInstructions+0x1dfad5'));
+        expect(d.firstFrame, '    #00 abs 000073f72cd8ea15 virt 00000000002b5a15 _kDartIsolateSnapshotInstructions+0x1dfad5');
+      });
+
+      test('build ID, OS and arch go along as attributes', () {
+        final a = describeError(StateError('x'), StackTrace.fromString(raw)).attributes(handled: false);
+        expect(a['zharp.dart_build_id'], '838fce00662e5c72cc7484da9007706e');
+        expect(a['zharp.dart_os'], 'android');
+        expect(a['zharp.dart_arch'], 'x64');
+      });
+
+      test('an arm64 header without a build ID (e.g. iOS) still says its OS and arch', () {
+        final build = DartBuildInfo.parse('*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***\n'
+            'pid: 1, tid: 2, name io.flutter.1.ui\n'
+            'os: ios arch: arm64 comp: yes sim: no\n'
+            'isolate_dso_base: 10a4c8000, vm_dso_base: 10a4c8000\n'
+            '    #00 abs 000000010a8e3b1c _kDartIsolateSnapshotInstructions+0x2a3b1c\n')!;
+        expect(build.attributes(), {'zharp.dart_os': 'ios', 'zharp.dart_arch': 'arm64'});
+      });
+
+      test('symbolic (non-obfuscated) stacks carry no build attributes', () {
+        try {
+          throw StateError('plain');
+        } catch (error, stack) {
+          final a = describeError(error, stack).attributes(handled: true);
+          expect(a.keys.where((key) => key.startsWith('zharp.dart_')), isEmpty);
+        }
+      });
     });
 
     test('reported errors are remembered; strings never are', () {

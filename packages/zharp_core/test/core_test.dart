@@ -159,6 +159,27 @@ void main() {
       });
     });
 
+    test('obfuscated stacks: errors from different places are not taken for repeats', () async {
+      const header = '*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***\n'
+          'pid: 4909, tid: 1, name 1.ui\n'
+          'os: android arch: arm64 comp: yes sim: no\n'
+          "build_id: '838fce00662e5c72cc7484da9007706e'\n"
+          'isolate_dso_base: 73f72cad9000, vm_dso_base: 73f72cad9000\n'
+          'isolate_instructions: 73f72cbaef40, vm_instructions: 73f72cb99000\n';
+      final zharp = start();
+      zharp.captureError('failed',
+          stackTrace: StackTrace.fromString('$header    #00 abs 000073f72cd8ea15 virt 00000000002b5a15 x'));
+      zharp.captureError('failed',
+          stackTrace: StackTrace.fromString('$header    #00 abs 000073f72cdc19df virt 00000000002e89df x'));
+      await zharp.flush();
+      expect(backend.logs, hasLength(2));
+      final a = attrs(backend.logs.first['attributes'] as List);
+      expect(a['exception.stacktrace'], startsWith('String: failed\n$header    #00 abs 000073f72cd8ea15'));
+      expect(a['zharp.dart_build_id'], '838fce00662e5c72cc7484da9007706e');
+      expect(a['zharp.dart_arch'], 'arm64');
+      expect(a['zharp.dart_os'], 'android');
+    });
+
     test('Zharp.log.error(e) with an error reports it as one', () async {
       final zharp = start();
       zharp.log.error(const FormatException('bad json'));

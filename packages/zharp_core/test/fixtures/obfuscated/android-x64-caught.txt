@@ -1,0 +1,9 @@
+StateError: Bad state: smoke caught error
+*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+pid: 4909, tid: 127519851700304, name 1.ui
+os: android arch: x64 comp: yes sim: no
+build_id: '838fce00662e5c72cc7484da9007706e'
+isolate_dso_base: 73f72cad9000, vm_dso_base: 73f72cad9000
+isolate_instructions: 73f72cbaef40, vm_instructions: 73f72cb99000
+    #00 abs 000073f72cdc19df virt 00000000002e89df _kDartIsolateSnapshotInstructions+0x212a9f
+<asynchronous suspension>

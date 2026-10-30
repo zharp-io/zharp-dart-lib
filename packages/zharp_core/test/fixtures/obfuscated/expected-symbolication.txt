@@ -1,0 +1,34 @@
+# What llvm-symbolizer (NDK 28.2) reads from app.android-x64.symbols (build_id 838fce00662e5c72cc7484da9007706e)
+# for each frame's 'virt' address, from `llvm-symbolizer --obj=app.android-x64.symbols --inlining 0x<virt>`.
+# Frames #01 and up are return addresses (shown as looked up, without the usual "- 1" for the call site).
+# Captured from `flutter build apk --obfuscate --split-debug-info` of packages/zharp_flutter/example (lib/smoke.dart,
+# Flutter 3.38.9) on an x86_64 emulator; the .txt stacks are exception.stacktrace exactly as zharp_core sent it,
+# android-x64-otlp-logs.json the whole OTLP/JSON logs request (with zharp.dart_build_id / _os / _arch).
+
+## android-x64-uncaught.txt
+#00 virt 0x00000000002b5a15
+    main.<anonymous closure>
+    <repo>/packages/zharp_flutter/example/lib/smoke.dart:41:19
+#01 virt 0x00000000000ecd30
+    Timer._createTimer.<anonymous closure>
+    third_party/dart/sdk/lib/_internal/vm/lib/timer_patch.dart:18:15
+#02 virt 0x00000000002baba5
+    _Timer._runTimers
+    third_party/dart/sdk/lib/_internal/vm/lib/timer_impl.dart:423:19
+#03 virt 0x00000000000eb869
+    _Timer._handleMessage
+    third_party/dart/sdk/lib/_internal/vm/lib/timer_impl.dart:454:5
+#04 virt 0x00000000000eb7f2
+    _Timer._handleMessage
+    third_party/dart/sdk/lib/_internal/vm/lib/timer_impl.dart:444:3
+#05 virt 0x00000000002f1130
+    _Closure.call
+    third_party/dart/sdk/lib/_internal/vm/lib/function.dart:0:0
+#06 virt 0x00000000000eb0c5
+    _RawReceivePort._handleMessage
+    third_party/dart/sdk/lib/_internal/vm/lib/isolate_patch.dart:193:12
+
+## android-x64-caught.txt
+#00 virt 0x00000000002e89df
+    main
+    <repo>/packages/zharp_flutter/example/lib/smoke.dart:37:5

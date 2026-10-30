@@ -65,6 +65,27 @@ With `tracing: false` no spans are created or sent: no screen-view spans, no HTT
 `tracingOrigins` has no effect). `Zharp.startSpan` still runs its callback. `ZharpNavigatorObserver`
 still sets `app.screen.name` on logs and errors.
 
+## Readable stack traces from obfuscated builds
+
+Release builds made with `--obfuscate --split-debug-info` report stacks as addresses. Upload the
+build's symbols and Zharp shows (and groups) those errors by your original functions, files and
+lines:
+
+```bash
+flutter build apk --obfuscate --split-debug-info=build/symbols     # or appbundle, ipa, …
+npx @zharp/cli dart-symbols upload build/symbols --app <application id>
+```
+
+`build/symbols` holds one `app.<os>-<arch>.symbols` file per architecture; upload them all, from
+the same build you ship (each is matched to the app by the snapshot's build ID). The upload needs a
+workspace API key with the `artifacts:write` scope in `ZHARP_AUTH_TOKEN` (a secret: CI only, never
+in the app or the repo), and `ZHARP_URL` for a self-hosted Zharp.
+
+Nothing changes in the app: zharp_flutter sends the stack exactly as the Dart VM writes it, with
+its header (`build_id`, `os`/`arch`, `isolate_dso_base`), and adds `zharp.dart_build_id`,
+`zharp.dart_os` and `zharp.dart_arch` to the error. Names of your own error classes are obfuscated
+too (`exception.type` may read like `a5`); the frames are what the symbols restore.
+
 ## Options
 
 | Option | Default | |

@@ -1,0 +1,14 @@
+StateError: Bad state: smoke uncaught error
+*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+pid: 4909, tid: 127519851700304, name 1.ui
+os: android arch: x64 comp: yes sim: no
+build_id: '838fce00662e5c72cc7484da9007706e'
+isolate_dso_base: 73f72cad9000, vm_dso_base: 73f72cad9000
+isolate_instructions: 73f72cbaef40, vm_instructions: 73f72cb99000
+    #00 abs 000073f72cd8ea15 virt 00000000002b5a15 _kDartIsolateSnapshotInstructions+0x1dfad5
+    #01 abs 000073f72cbc5d30 virt 00000000000ecd30 _kDartIsolateSnapshotInstructions+0x16df0
+    #02 abs 000073f72cd93ba5 virt 00000000002baba5 _kDartIsolateSnapshotInstructions+0x1e4c65
+    #03 abs 000073f72cbc4869 virt 00000000000eb869 _kDartIsolateSnapshotInstructions+0x15929
+    #04 abs 000073f72cbc47f2 virt 00000000000eb7f2 _kDartIsolateSnapshotInstructions+0x158b2
+    #05 abs 000073f72cdca130 virt 00000000002f1130 _kDartIsolateSnapshotInstructions+0x21b1f0
+    #06 abs 000073f72cbc40c5 virt 00000000000eb0c5 _kDartIsolateSnapshotInstructions+0x15185
