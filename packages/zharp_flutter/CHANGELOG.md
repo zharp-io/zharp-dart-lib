@@ -1,4 +1,4 @@
-## Unreleased
+## 0.2.0
 
 - `ZharpOptions.captureBodies`: request and response bodies on traced requests, off by default
   (see the README).

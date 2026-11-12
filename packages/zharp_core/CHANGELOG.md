@@ -1,4 +1,4 @@
-## Unreleased
+## 0.2.0
 
 - `ZharpOptions.captureBodies` (`CaptureBodies()` / `CaptureBodies.all()`): request and response
   bodies on `ZharpHttpClient` spans, off by default — failed requests only unless `all`. Field
