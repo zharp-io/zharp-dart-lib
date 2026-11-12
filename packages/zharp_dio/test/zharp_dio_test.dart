@@ -14,14 +14,22 @@ class FakeAdapter implements HttpClientAdapter {
   final List<RequestOptions> seen = [];
   int status = 200;
   bool fail = false;
+  String body = '{}';
+  List<int>? bytes;
+  String contentType = 'application/json';
 
   @override
   Future<ResponseBody> fetch(
       RequestOptions options, Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
     seen.add(options);
     if (fail) throw const SocketException('unreachable');
-    return ResponseBody.fromString('{}', status, headers: {
-      Headers.contentTypeHeader: ['application/json'],
+    if (bytes != null) {
+      return ResponseBody.fromBytes(bytes!, status, headers: {
+        Headers.contentTypeHeader: [contentType],
+      });
+    }
+    return ResponseBody.fromString(body, status, headers: {
+      Headers.contentTypeHeader: [contentType],
     });
   }
 
@@ -129,5 +137,80 @@ void main() {
     expect(adapter.seen.single.headers.containsKey('baggage'), isFalse);
     expect(spans(), isEmpty);
     expect(sent.where((r) => r.url.path.endsWith('/v1/logs')), hasLength(1));
+  });
+
+  group('captureBodies', () {
+    Future<void> restart(CaptureBodies capture) async {
+      await ZharpCore.instance!.close();
+      ZharpCore.start(ZharpOptions(
+        key: 'zpk_test',
+        endpoint: 'https://ingest.test/api/v1/otlp',
+        captureBodies: capture,
+        httpClient: MockClient((request) async {
+          sent.add(request);
+          return http.Response('{}', 200);
+        }),
+      ));
+    }
+
+    Map<String, Object?> named(String name) => attrs(spans().firstWhere((s) => s['name'] == name));
+
+    test('errors: JSON both ways on a failed request, secrets filtered; successes carry nothing', () async {
+      await restart(const CaptureBodies());
+      adapter
+        ..status = 401
+        ..body = '{"error":"bad credentials","token":"leaked","card":{"brand":"visa","last4":"4242"}}';
+      await expectLater(dio.post<dynamic>('https://api.shop.test/login', data: {'email': 'a@b.test', 'password': 'hunter2'}),
+          throwsA(isA<DioException>()));
+      adapter
+        ..status = 200
+        ..body = '{"saved":true}';
+      await dio.put<dynamic>('https://api.shop.test/ok', data: {'name': 'Ada'});
+      await ZharpCore.instance!.flush();
+
+      final login = named('POST api.shop.test/login');
+      expect(jsonDecode(login['http.request.body'] as String), {'email': 'a@b.test', 'password': '[Filtered]'});
+      expect(jsonDecode(login['http.response.body'] as String),
+          {'error': 'bad credentials', 'token': '[Filtered]', 'card': {'brand': '[Filtered]', 'last4': '[Filtered]'}});
+      expect(login['http.response.header.content-type'], 'application/json');
+      expect(named('PUT api.shop.test/ok').containsKey('http.request.body'), isFalse);
+    });
+
+    test('FormData: every field by name, files described, the password filtered', () async {
+      await restart(const CaptureBodies.all());
+      final form = FormData.fromMap({
+        'title': 'Holiday',
+        'password': 'form-secret',
+        'photo': MultipartFile.fromBytes(List.filled(2048, 1), filename: 'photo.png', contentType: DioMediaType('image', 'png')),
+      });
+      await dio.post<dynamic>('https://api.shop.test/upload', data: form);
+      await ZharpCore.instance!.flush();
+      final upload = named('POST api.shop.test/upload');
+      expect(jsonDecode(upload['http.request.body'] as String),
+          {'title': 'Holiday', 'password': '[Filtered]', 'photo': '[file photo.png · image/png · 2 KB]'});
+      expect(upload['http.request.header.content-type'], 'multipart/form-data');
+    });
+
+    test('form-urlencoded maps, binary responses described, no response keeps the request body', () async {
+      await restart(const CaptureBodies.all());
+      await dio.post<dynamic>('https://api.shop.test/form',
+          data: {'user': 'ada', 'password': 'p4ss'}, options: Options(contentType: Headers.formUrlEncodedContentType));
+      adapter
+        ..bytes = List.filled(3000, 7)
+        ..contentType = 'image/png';
+      await dio.get<dynamic>('https://api.shop.test/image', options: Options(responseType: ResponseType.bytes));
+      adapter.fail = true;
+      await expectLater(dio.post<dynamic>('https://api.shop.test/pay', data: {'amount': 5, 'cvv': '123'}), throwsA(isA<DioException>()));
+      await ZharpCore.instance!.flush();
+      expect(named('POST api.shop.test/form')['http.request.body'], 'user=ada&password=[Filtered]');
+      expect(named('GET api.shop.test/image')['http.response.body'], '[binary · image/png · 3 KB]');
+      expect(named('POST api.shop.test/pay')['http.request.body'], '{"amount":5,"cvv":"[Filtered]"}');
+    });
+
+    test('secret query values are filtered in url.full', () async {
+      await dio.get<dynamic>('https://api.shop.test/x?token=abc&page=2');
+      await ZharpCore.instance!.flush();
+      expect(named('GET api.shop.test/x')['url.full'], 'https://api.shop.test/x?token=[Filtered]&page=2');
+    });
   });
 }

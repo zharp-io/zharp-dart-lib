@@ -11,6 +11,18 @@
 /// ```
 library;
 
+export 'src/bodies.dart'
+    show
+        BodyMode,
+        BodySettings,
+        CaptureBodies,
+        bodyAttributes,
+        bytesAttributes,
+        describedAttributes,
+        fileLabel,
+        isEventStream,
+        isTextual,
+        redactQuery;
 export 'src/core.dart' show ZharpCore, ZharpLog, ZharpUser, normalizeEndpoint;
 export 'src/ids.dart' show newUuid;
 export 'src/errors.dart' show ExceptionDescription, describeError, markReported, wasReported;

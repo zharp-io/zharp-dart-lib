@@ -10,7 +10,7 @@
 library;
 
 export 'package:zharp_core/zharp_core.dart'
-    show Severity, SpanKind, ZharpHttpClient, ZharpOptions, ZharpSpan, ZharpUser, sdkVersion;
+    show BodyMode, CaptureBodies, Severity, SpanKind, ZharpHttpClient, ZharpOptions, ZharpSpan, ZharpUser, sdkVersion;
 
 export 'src/navigator_observer.dart' show ZharpNavigatorObserver;
 export 'src/zharp.dart' show Zharp, ZharpLogger;

@@ -46,6 +46,9 @@ class ZharpSpan {
   final DateTime Function() _clock;
 
   String get name => _name;
+
+  /// The SDK's clock (a fake one in tests): what [end] uses when given no time.
+  DateTime now() => _clock();
   bool get isEnded => _endMicros != null;
   int get startMicros => _startMicros;
   int? get endMicros => _endMicros;

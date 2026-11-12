@@ -1,5 +1,7 @@
 import 'package:http/http.dart' as http;
 
+import 'bodies.dart';
+
 /// Where telemetry goes unless `endpoint` says otherwise.
 const String defaultEndpoint = 'https://api.zharp.io/api/v1/otlp';
 
@@ -26,6 +28,7 @@ class ZharpOptions {
     this.maxBatchSize = 100,
     this.maxQueueSize = 1000,
     this.httpClient,
+    this.captureBodies,
   });
 
   /// The app's key from the Zharp dashboard, `zpk_…`. It can only send, so it is safe to ship in
@@ -93,6 +96,18 @@ class ZharpOptions {
   /// Spans (and, separately, logs) kept in memory while they can't be sent. When full, the
   /// oldest are dropped.
   final int maxQueueSize;
+
+  /// Request and response bodies on HTTP CLIENT spans (`ZharpHttpClient`, `zharp_dio`). Off
+  /// (null) by default. `CaptureBodies()` keeps them for failed requests only — status 400 and
+  /// above, or no response; `CaptureBodies.all()` for every request. Every request the app makes
+  /// is covered, never Zharp's own; `urls` narrows that.
+  ///
+  /// Text is kept up to 32 KB (`maxSize`, at most 128 KB). Field names always stay; values under
+  /// secret-looking keys (`password`, `token`, `authorization`, `card`, …) become `[Filtered]`
+  /// before anything leaves the app. Files in uploads, inline images and binary bodies are
+  /// described — `[file photo.png · image/png · 240 KB]` — never sent. Other personal data in a
+  /// body is sent as it is: add its keys to `redactKeys`.
+  final CaptureBodies? captureBodies;
 
   /// The client telemetry is sent with; one is made when not given. Not the client your app's
   /// requests are traced on — see `ZharpHttpClient`.

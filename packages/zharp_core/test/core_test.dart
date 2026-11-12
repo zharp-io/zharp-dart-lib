@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:async';
 
 import 'package:fake_async/fake_async.dart';
@@ -18,6 +19,7 @@ void main() {
           {List<Pattern> tracingOrigins = const [],
           double sampleRate = 1.0,
           bool tracing = true,
+          CaptureBodies? captureBodies,
           DateTime Function()? clock}) =>
       ZharpCore.start(
           clock: clock,
@@ -30,6 +32,7 @@ void main() {
             tracingOrigins: tracingOrigins,
             sampleRate: sampleRate,
             tracing: tracing,
+            captureBodies: captureBodies,
             httpClient: backend.client,
           ))!;
 
@@ -411,5 +414,105 @@ void main() {
     await zharp.close();
     zharp.log.info('after close');
     zharp.captureError(StateError('after close'));
+  });
+
+  group('captureBodies on ZharpHttpClient', () {
+    late List<http.BaseRequest> seen;
+    late http.Client app;
+
+    setUp(() {
+      seen = [];
+      app = MockClient((request) async {
+        seen.add(request);
+        final path = request.url.path;
+        if (path == '/login') {
+          return http.Response(jsonEncode({'error': 'bad credentials', 'token': 'leaked'}), 401,
+              headers: {'content-type': 'application/json'});
+        }
+        if (path == '/image') return http.Response.bytes(List.filled(3000, 7), 500, headers: {'content-type': 'image/png'});
+        if (path == '/big') return http.Response('y' * 200000, 500, headers: {'content-type': 'text/plain'});
+        return http.Response('{"saved":true}', 200, headers: {'content-type': 'application/json'});
+      });
+    });
+
+    Map<String, Object?> spanAttrs(String name) =>
+        attrs(backend.spans.firstWhere((s) => s['name'] == name)['attributes'] as List);
+
+    test('errors: a failed request carries both bodies, secrets filtered; the app reads its response as before', () async {
+      final zharp = start(captureBodies: const CaptureBodies());
+      final client = ZharpHttpClient(app);
+      final login = await client.post(Uri.parse('https://api.shop.test/login'),
+          headers: {'content-type': 'application/json'}, body: jsonEncode({'email': 'a@b.test', 'password': 'hunter2'}));
+      expect(jsonDecode(login.body)['error'], 'bad credentials');
+      await client.post(Uri.parse('https://api.shop.test/ok'), headers: {'content-type': 'application/json'}, body: '{"name":"Ada"}');
+      await zharp.flush();
+
+      final a = spanAttrs('POST api.shop.test/login');
+      expect(jsonDecode(a['http.request.body'] as String), {'email': 'a@b.test', 'password': '[Filtered]'});
+      expect(jsonDecode(a['http.response.body'] as String), {'error': 'bad credentials', 'token': '[Filtered]'});
+      expect(a['http.response.header.content-type'], 'application/json');
+      final ok = spanAttrs('POST api.shop.test/ok');
+      expect(ok.containsKey('http.request.body'), isFalse);
+      expect(ok.containsKey('http.response.body'), isFalse);
+    });
+
+    test('a form upload: fields by name, files described, secrets filtered', () async {
+      final zharp = start(captureBodies: const CaptureBodies.all());
+      final client = ZharpHttpClient(app);
+      final upload = http.MultipartRequest('POST', Uri.parse('https://api.shop.test/upload'))
+        ..fields['title'] = 'Holiday'
+        ..fields['password'] = 'form-secret'
+        ..files.add(http.MultipartFile.fromBytes('photo', List.filled(2048, 1), filename: 'photo.png'));
+      await (await client.send(upload)).stream.drain<void>();
+      await zharp.flush();
+      final a = spanAttrs('POST api.shop.test/upload');
+      expect(jsonDecode(a['http.request.body'] as String),
+          {'title': 'Holiday', 'password': '[Filtered]', 'photo': '[file photo.png · application/octet-stream · 2 KB]'});
+      expect(a['http.request.header.content-type'], 'multipart/form-data');
+    });
+
+    test('binary responses are described; long ones cut at maxSize; the app still gets every byte', () async {
+      final zharp = start(captureBodies: const CaptureBodies(maxSize: 1000));
+      final client = ZharpHttpClient(app);
+      final image = await client.get(Uri.parse('https://api.shop.test/image'));
+      final big = await client.get(Uri.parse('https://api.shop.test/big'));
+      expect(image.bodyBytes.length, 3000);
+      expect(big.body.length, 200000);
+      await zharp.flush();
+      expect(spanAttrs('GET api.shop.test/image')['http.response.body'], '[binary · image/png · 3 KB]');
+      final b = spanAttrs('GET api.shop.test/big');
+      expect((b['http.response.body'] as String).length, 1000);
+      expect(b['http.response.body.truncated'], isTrue);
+    });
+
+    test('the span ends when the response arrived, even if the body is read later', () async {
+      var now = DateTime.utc(2026, 1, 1, 12);
+      final zharp = start(captureBodies: const CaptureBodies(), clock: () => now);
+      final client = ZharpHttpClient(app);
+      final response = await client.send(http.Request('GET', Uri.parse('https://api.shop.test/login')));
+      now = now.add(const Duration(seconds: 2));
+      await response.stream.drain<void>();
+      await zharp.flush();
+      final span = backend.spans.firstWhere((s) => s['name'] == 'GET api.shop.test/login');
+      expect(span['endTimeUnixNano'], span['startTimeUnixNano']);
+    });
+
+    test('off by default; urls narrows it; no response still keeps the request body', () async {
+      var zharp = start();
+      var client = ZharpHttpClient(app);
+      await client.post(Uri.parse('https://api.shop.test/login'), body: '{"a":1}');
+      await zharp.flush();
+      expect(spanAttrs('POST api.shop.test/login').containsKey('http.request.body'), isFalse);
+      await zharp.close();
+
+      backend = FakeBackend();
+      zharp = start(captureBodies: const CaptureBodies(urls: ['api.shop.test']));
+      client = ZharpHttpClient(MockClient((_) async => throw http.ClientException('offline')));
+      await expectLater(client.post(Uri.parse('https://api.shop.test/pay'), body: '{"amount":5,"cvv":"123"}'), throwsA(isA<http.ClientException>()));
+      await expectLater(ZharpHttpClient(app).post(Uri.parse('https://cdn.other.test/x'), body: '{"n":1}'), completes);
+      await zharp.flush();
+      expect(spanAttrs('POST api.shop.test/pay')['http.request.body'], '{"amount":5,"cvv":"[Filtered]"}');
+      expect(spanAttrs('POST cdn.other.test/x').containsKey('http.request.body'), isFalse);
+    });
   });
 }

@@ -65,6 +65,34 @@ With `tracing: false` no spans are created or sent: no screen-view spans, no HTT
 `tracingOrigins` has no effect). `Zharp.startSpan` still runs its callback. `ZharpNavigatorObserver`
 still sets `app.screen.name` on logs and errors.
 
+## Request and response bodies
+
+Off by default. Turn on `captureBodies` to see what a request sent and what came back, under the
+request in the trace (`ZharpHttpClient` and `zharp_dio`):
+
+```dart
+await Zharp.init(ZharpOptions(
+  key: 'zpk_…',
+  captureBodies: const CaptureBodies(),   // failed requests only; CaptureBodies.all() for every one
+));
+```
+
+- `CaptureBodies()` keeps bodies for requests that failed (status 400 and above, or no response);
+  `CaptureBodies.all()` for every request. Every request the app makes is covered, never Zharp's
+  own; `urls` (written like `tracingOrigins`) narrows that.
+- Text — JSON, forms, XML, plain text — is kept up to 32 KB (`maxSize`, up to 128 KB). Every field
+  name stays. Files in uploads show as `[file photo.png · image/png · 240 KB]`, inline images as
+  `[image/png · 24 KB]`, other bodies as `[binary · application/pdf · 1.2 MB]`. File contents are
+  never sent.
+- Values under secret-looking keys (`password`, `token`, `apiKey`, `authorization`, `cookie`,
+  `card`, `cvv`, `ssn`, …) become `[Filtered]` in the app, before anything is sent; under a secret
+  object, each value inside is hidden and its keys kept. Other personal data (names, emails) is
+  sent as it is: add those keys to `redactKeys`.
+- Your app reads its responses exactly as before; the span keeps the time the response arrived.
+
+Whether or not bodies are on, secret-looking query values in URLs (`?token=`, `key`, `sig`,
+`password`, …) are recorded as `[Filtered]`.
+
 ## Readable stack traces from obfuscated builds
 
 Release builds made with `--obfuscate --split-debug-info` report stacks as addresses. Upload the
@@ -95,6 +123,7 @@ too (`exception.type` may read like `a5`); the frames are what the symbols resto
 | `endpoint` | `https://api.zharp.io/api/v1/otlp` | |
 | `tracing` | `true` | `false` = logs only (see above) |
 | `tracingOrigins` | `[]` | Hosts (`api.example.com`, `*.example.com`), origins, or `RegExp`s |
+| `captureBodies` | off | `CaptureBodies()` or `CaptureBodies.all()` — see above |
 | `sampleRate` | `1.0` | Share of traces kept; errors and logs are always sent |
 | `enabled` | `true` | e.g. `enabled: kReleaseMode` |
 | `captureErrors` | `true` | |

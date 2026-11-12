@@ -1,3 +1,8 @@
+## Unreleased
+
+- `ZharpOptions.captureBodies`: request and response bodies on traced requests, off by default
+  (see the README).
+
 ## 0.1.0
 
 - First release of Zharp Application Monitoring for Flutter: `Zharp.init`, uncaught Flutter,

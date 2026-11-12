@@ -1,3 +1,13 @@
+## Unreleased
+
+- `ZharpOptions.captureBodies` (`CaptureBodies()` / `CaptureBodies.all()`): request and response
+  bodies on `ZharpHttpClient` spans, off by default — failed requests only unless `all`. Field
+  names kept, secret-looking values `[Filtered]` (nested objects keep their keys), files in
+  uploads, inline images and binary bodies described, text capped at 32 KB (`maxSize`, up to
+  128 KB). The span keeps the time the response arrived. Same rules as the JS SDKs.
+- `url.full`: the secret query keys now follow the shared rules (`token`, `key`, `sig`, `code`,
+  `state`, `password`, …) used by every Zharp SDK.
+
 ## 0.1.0
 
 - First release: the engine behind `zharp_flutter` and `zharp_dio`. Spans, logs and errors as
