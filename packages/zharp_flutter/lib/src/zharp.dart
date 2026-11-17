@@ -25,6 +25,7 @@ abstract final class Zharp {
   static ErrorCallback? _previousPlatformError;
   static bool _hookedErrors = false;
   static _Lifecycle? _lifecycle;
+  static DebugPrintCallback? _previousDebugPrint;
 
   /// Start Zharp. Call it first thing in `main()`, before `runApp`.
   ///
@@ -48,6 +49,7 @@ abstract final class Zharp {
       });
       await device.timeout(const Duration(milliseconds: 500), onTimeout: () {});
       if (options.captureErrors) _hookErrors(options);
+      if (core.capturesOutput) _hookDebugPrint();
       _lifecycle = _Lifecycle();
       WidgetsBinding.instance.addObserver(_lifecycle!);
     } catch (error) {
@@ -113,9 +115,12 @@ abstract final class Zharp {
     await ZharpCore.instance?.close();
   }
 
-  /// Run [body] in a zone whose uncaught errors are reported — for apps that run code in their
-  /// own zones. Not needed otherwise: [init] already catches what reaches Flutter. Call [init]
-  /// *inside* it, so Flutter's binding and `runApp` share the zone:
+  /// Run [body] in a zone whose uncaught errors are reported, and where `print` — and so the
+  /// `logger` package and anything else printing — is sent as logs too (with
+  /// [ZharpOptions.captureOutput], the default). Without it, [init] still catches what reaches
+  /// Flutter's error handlers, `debugPrint` and `package:logging`, but not `print`: Dart offers
+  /// no way to see it outside a zone. Call [init] *inside* it, so Flutter's binding and `runApp`
+  /// share the zone:
   ///
   /// ```dart
   /// void main() => Zharp.guard(() async {
@@ -124,7 +129,7 @@ abstract final class Zharp {
   /// });
   /// ```
   static void guard(FutureOr<void> Function() body) {
-    runZonedGuarded(body, (error, stack) {
+    runZonedGuarded(() => runCapturingOutput(body), (error, stack) {
       reportUncaught(error, stack, mechanism: 'zone');
       // Still printed, as an uncaught error would be.
       FlutterError.presentError(FlutterErrorDetails(exception: error, stack: stack, library: 'zharp guard'));
@@ -166,6 +171,21 @@ abstract final class Zharp {
     _hookedErrors = true;
   }
 
+  /// `debugPrint` — where Flutter's own messages and many packages log — is sent as logs too, and
+  /// still printed. Its throttled printing happens later, so each line is remembered once sent.
+  static void _hookDebugPrint() {
+    if (identical(debugPrint, _debugPrint)) return;
+    _previousDebugPrint = debugPrint;
+    debugPrint = _debugPrint;
+  }
+
+  static void _debugPrint(String? message, {int? wrapWidth}) {
+    captureMessage(message, source: 'debugPrint', remember: true);
+    final original = _previousDebugPrint ?? debugPrintThrottled;
+    // What it prints right away is already captured.
+    quietly(() => original(message, wrapWidth: wrapWidth));
+  }
+
   static String? _safeText(Object? value) {
     try {
       return value?.toString();
@@ -175,6 +195,10 @@ abstract final class Zharp {
   }
 
   static void _unhook() {
+    if (_previousDebugPrint != null) {
+      if (identical(debugPrint, _debugPrint)) debugPrint = _previousDebugPrint!;
+      _previousDebugPrint = null;
+    }
     if (_hookedErrors) {
       FlutterError.onError = _previousFlutterError;
       PlatformDispatcher.instance.onError = _previousPlatformError;

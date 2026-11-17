@@ -4,6 +4,7 @@ import 'errors.dart';
 import 'exporter.dart';
 import 'otlp.dart';
 import 'options.dart';
+import 'output.dart';
 import 'platform.dart';
 import 'propagation.dart';
 import 'session.dart';
@@ -100,6 +101,7 @@ class ZharpCore {
       now,
     );
     _instance = core;
+    if (core.capturesOutput) core._stopLogging = captureLoggingRecords();
     if (options.debug) {
       _print('Started — service "${resource['service.name']}", sending to ${exporter.endpoint}');
     }
@@ -117,6 +119,24 @@ class ZharpCore {
 
   late final Tracer tracer;
   late final ZharpLog log;
+
+  /// Whether what the app prints is sent as logs ([ZharpOptions.captureOutput], unless
+  /// `ZHARP_CAPTURE_OUTPUT=false`).
+  late final bool capturesOutput = options.captureOutput && outputCaptureAllowed();
+  void Function()? _stopLogging;
+
+  /// Run [body] where `print` and writes to `stdout` and `stderr` are also sent as logs (with
+  /// [ZharpOptions.captureOutput], the default) — for Dart servers and command-line tools.
+  /// Everything is still printed as before; errors and the return value are [body]'s own. Start
+  /// Zharp inside it or before it:
+  ///
+  /// ```dart
+  /// void main() => ZharpCore.run(() async {
+  ///   ZharpCore.start(ZharpOptions(key: 'zpk_…', service: 'api'));
+  ///   await serve();
+  /// });
+  /// ```
+  static R run<R>(R Function() body) => runCapturingOutput(body);
 
   ZharpUser? _user;
   final Map<String, Object> _tags = {};
@@ -334,6 +354,7 @@ class ZharpCore {
   /// Send everything queued now.
   Future<void> flush() async {
     try {
+      flushCapturedOutput();
       await _exporter.flush();
     } catch (_) {}
   }
@@ -342,6 +363,10 @@ class ZharpCore {
   Future<void> close({Duration timeout = const Duration(seconds: 5)}) async {
     if (_closed) return;
     _closed = true;
+    try {
+      flushCapturedOutput();
+      _stopLogging?.call();
+    } catch (_) {}
     if (identical(_instance, this)) _instance = null;
     try {
       tracer.endIdle();
@@ -386,18 +411,33 @@ class ZharpLog {
   void _emit(Severity severity, Object? message, Map<String, Object?>? attributes) {
     try {
       if (_core._closed) return;
-      final span = _core.tracer.current;
-      _core._exporter.addLog(LogData(
-        timeMicros: _core._clock().microsecondsSinceEpoch,
-        severity: severity,
-        body: _bodyOf(message),
-        attributes: {..._core.contextAttributes(), ...sanitizeAttributes(attributes)},
-        traceId: span?.traceId,
-        spanId: span?.spanId,
-      ));
+      final body = _bodyOf(message);
+      _add(severity, body, attributes, _core.tracer.current);
+      // If the app prints it too, that copy isn't sent again.
+      rememberSent(body);
     } catch (_) {
       // Never into the host app.
     }
+  }
+
+  /// A record from one of the output captures (`package:logging`, `print`, `debugPrint`,
+  /// stdout), in [span] — the span current where it was written.
+  void emitCaptured(Severity severity, String body, Map<String, Object?> attributes, {ZharpSpan? span}) {
+    try {
+      if (_core._closed) return;
+      _add(severity, body, attributes, span);
+    } catch (_) {}
+  }
+
+  void _add(Severity severity, String body, Map<String, Object?>? attributes, ZharpSpan? span) {
+    _core._exporter.addLog(LogData(
+      timeMicros: _core._clock().microsecondsSinceEpoch,
+      severity: severity,
+      body: body,
+      attributes: {..._core.contextAttributes(), ...sanitizeAttributes(attributes)},
+      traceId: span?.traceId,
+      spanId: span?.spanId,
+    ));
   }
 
   String _bodyOf(Object? message) {

@@ -8,3 +8,6 @@ http.Client createHttpClient() => http.Client();
 Map<String, Object> platformAttributes() => const {'os.name': 'web'};
 
 String? environmentValue(String name) => null;
+
+/// No stdout or stderr on the web: [body] just runs.
+R runWithCapturedStdio<R>(R Function() body, void Function(String chunk, {required bool isError}) capture) => body();

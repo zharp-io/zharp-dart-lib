@@ -29,6 +29,7 @@ class ZharpOptions {
     this.maxQueueSize = 1000,
     this.httpClient,
     this.captureBodies,
+    this.captureOutput = true,
   });
 
   /// The app's key from the Zharp dashboard, `zpk_…`. It can only send, so it is safe to ship in
@@ -108,6 +109,20 @@ class ZharpOptions {
   /// described — `[file photo.png · image/png · 240 KB]` — never sent. Other personal data in a
   /// body is sent as it is: add its keys to `redactKeys`.
   final CaptureBodies? captureBodies;
+
+  /// Send what the app prints as logs too, each line tied to the trace and session it was
+  /// written in. On by default; `false` — or `ZHARP_CAPTURE_OUTPUT=false` in the environment or
+  /// as a `--dart-define` — turns it off.
+  ///
+  /// - `package:logging` records, with their own level and logger name (`log.logger`).
+  /// - Flutter's `debugPrint` (zharp_flutter), which Flutter and many packages log through.
+  /// - Inside `Zharp.guard` (Flutter) or `ZharpCore.run` (Dart): `print` — and so the `logger`
+  ///   package, whose boxes become one record — and writes to `stdout`/`stderr`.
+  ///
+  /// A line's level is read from the line (a JSON `level`, `ERROR`, `[warn]`, `level=error`,
+  /// `SEVERE`, the `logger` package's `[E]` or emoji), else info — warning on `stderr`. What is
+  /// printed is unchanged, and a line is never sent twice.
+  final bool captureOutput;
 
   /// The client telemetry is sent with; one is made when not given. Not the client your app's
   /// requests are traced on — see `ZharpHttpClient`.

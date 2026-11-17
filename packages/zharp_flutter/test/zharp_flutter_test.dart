@@ -1,11 +1,16 @@
+// ignore_for_file: avoid_print
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:logging/logging.dart';
+import 'package:zharp_core/zharp_core.dart' show resetOutputCapture;
 import 'package:zharp_flutter/src/device.dart';
 import 'package:zharp_flutter/zharp_flutter.dart';
 
@@ -335,6 +340,93 @@ void main() {
       await Zharp.flush();
       expect(backend.spans.map((s) => s['name']), ['screen /']);
       await Zharp.close();
+    });
+  });
+
+  group('output', () {
+    late List<String?> printed;
+    late DebugPrintCallback originalDebugPrint;
+
+    setUp(() {
+      resetOutputCapture();
+      printed = [];
+      originalDebugPrint = debugPrint;
+      // Stands in for the console.
+      debugPrint = (message, {wrapWidth}) => printed.add(message);
+    });
+    tearDown(() => debugPrint = originalDebugPrint);
+
+    List<String> bodies() => [for (final log in backend.logs) log['body']['stringValue'] as String];
+
+    test('debugPrint is sent at the level its line says, still printed, and put back on close', () async {
+      final console = debugPrint;
+      await Zharp.init(options());
+      expect(debugPrint, isNot(same(console)));
+      late ZharpSpan span;
+      Zharp.startSpan('checkout', (s) {
+        span = s;
+        debugPrint('Cart loaded with 3 items');
+      });
+      debugPrint('WARNING: low disk space');
+      await Future<void>.delayed(Duration.zero);
+      await Zharp.flush();
+      expect(bodies(), ['Cart loaded with 3 items', 'WARNING: low disk space']);
+      expect([for (final log in backend.logs) log['severityText']], ['INFO', 'WARN']);
+      expect(backend.logs.first['spanId'], span.spanId);
+      expect(attrs(backend.logs.first['attributes'] as List)['log.source'], 'debugPrint');
+      expect(printed, ['Cart loaded with 3 items', 'WARNING: low disk space']);
+      await Zharp.close();
+      expect(debugPrint, same(console));
+    });
+
+    test("Flutter's dump of an error Zharp reported is not sent again as a log", () async {
+      final original = FlutterError.onError;
+      // Flutter's console dump (a test's presentError reports elsewhere).
+      FlutterError.onError = (details) => FlutterError.dumpErrorToConsole(details, forceReport: true);
+      try {
+        await Zharp.init(options());
+        FlutterError.reportError(FlutterErrorDetails(exception: StateError('cart is empty'), library: 'widgets'));
+        await Future<void>.delayed(Duration.zero);
+        await Zharp.flush();
+        expect(printed.join('\n'), contains('cart is empty'));
+        expect(backend.logs, hasLength(1));
+        expect(attrs(backend.logs.single['attributes'] as List)['exception.type'], 'StateError');
+      } finally {
+        await Zharp.close();
+        FlutterError.onError = original;
+      }
+    });
+
+    test('inside guard, print is sent (and the logger box is one record); package:logging always', () async {
+      final done = Completer<void>();
+      runZoned(
+        () => Zharp.guard(() async {
+          await Zharp.init(options());
+          print('Signed in');
+          print('┌───────────');
+          print('│ 💡 Feed refreshed');
+          print('└───────────');
+          done.complete();
+        }),
+        zoneSpecification: ZoneSpecification(print: (self, parent, zone, line) => printed.add(line)),
+      );
+      await done.future;
+      Logger('feed').warning('stale cache');
+      await Future<void>.delayed(Duration.zero);
+      await Zharp.flush();
+      expect(bodies(), ['Signed in', '💡 Feed refreshed', 'stale cache']);
+      expect([for (final log in backend.logs) log['severityText']], ['INFO', 'INFO', 'WARN']);
+      expect(printed, hasLength(4));
+    });
+
+    test('captureOutput: false leaves debugPrint alone', () async {
+      final console = debugPrint;
+      await Zharp.init(ZharpOptions(
+          key: 'zpk_test', endpoint: 'https://ingest.test/api/v1/otlp', httpClient: backend.client, captureOutput: false));
+      expect(debugPrint, same(console));
+      debugPrint('hello');
+      await Zharp.flush();
+      expect(backend.logs, isEmpty);
     });
   });
 

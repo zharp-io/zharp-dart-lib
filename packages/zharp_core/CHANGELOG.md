@@ -1,3 +1,14 @@
+## Unreleased
+
+- `ZharpOptions.captureOutput` (on by default; `ZHARP_CAPTURE_OUTPUT=false` turns it off): what
+  the program prints is sent as logs, tied to the span it was written in, still printed as before.
+  `package:logging` records always, with their level and `log.logger`; inside `ZharpCore.run`,
+  `print` and `stdout`/`stderr` too. The level is read from the line (JSON `level`, `ERROR`,
+  `[warn]`, `level=error`, `SEVERE`, the `logger` package's `[E]`/emoji — its boxes become one
+  record), else info, or warning on stderr. Lines are capped at 32 KB, colour codes dropped, an
+  unfinished line sent after 200 ms, and a line already sent is never sent twice.
+- New dependency: `package:logging`.
+
 ## 0.2.0
 
 - `ZharpOptions.captureBodies` (`CaptureBodies()` / `CaptureBodies.all()`): request and response

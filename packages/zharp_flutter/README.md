@@ -32,7 +32,9 @@ Zharp.clearUser();
   before are kept), with their Dart stack, as unhandled. Errors in your own zones:
   `Zharp.guard(() async { await Zharp.init(…); runApp(…); })`.
 - **Caught errors** — `Zharp.captureError(error, stackTrace: stack, attributes: {…})`, as handled.
-- **Logs** — `Zharp.log.debug/info/warn/error('message', {'key': value})`, tied to the current trace.
+- **Logs** — `Zharp.log.debug/info/warn/error('message', {'key': value})`, tied to the current
+  trace; and what the app already logs — `debugPrint`, `package:logging`, and inside
+  `Zharp.guard` also `print` and the `logger` package (see below).
 - **Screen views** — add `ZharpNavigatorObserver()` to `navigatorObservers` (or go_router's
   `observers`). Each named page route becomes a root span `screen <name>` that lasts until the
   screen is drawn and its requests have finished; everything recorded meanwhile carries
@@ -51,6 +53,37 @@ Zharp.clearUser();
 Telemetry is batched (every 5 s or 100 records), gzipped, retried with backoff, kept in memory
 (capped) while offline, and sent when the app goes to the background. The SDK never throws into
 your app; it prints one warning if the key is rejected (`debug: true` prints more).
+
+## Logs from what the app prints
+
+You don't have to move your logging to `Zharp.log`. With `captureOutput` (on by default) what the
+app already logs is sent too, each line tied to the trace, span, screen and session it was
+written in, and still printed exactly as before:
+
+| Written with | Sent |
+|---|---|
+| `debugPrint` (Flutter's own messages, many packages) | always |
+| `package:logging` (`Logger('feed').warning(…)`) | always, with its own level and `log.logger`; SEVERE with an error is filed as an error |
+| `print`, the `logger` package, `stdout`/`stderr` | inside `Zharp.guard` |
+
+```dart
+void main() => Zharp.guard(() async {
+  await Zharp.init(ZharpOptions(key: 'zpk_…', service: 'shop-app'));
+  runApp(const MyApp());
+});
+```
+
+Dart gives no way to see `print` outside a zone, so without `Zharp.guard` it isn't sent. A line's
+level is read from the line — a JSON `level`, `ERROR`, `[warn]`, `level=error`, `SEVERE`, the
+`logger` package's `[E]` or emoji (its boxes become one record) — else info (warning on `stderr`).
+A line is never sent twice: `Zharp.log` or a `package:logging` record that is also printed, and
+Flutter's console dump of an error Zharp already reported, are sent once. Lines Zharp prints about
+itself (`[Zharp] …`) are left out.
+
+Not captured: `dart:developer`'s `log()` (it goes to the debugger, not through anything an app
+can hook), native Android/iOS logs (logcat, `os_log`, `NSLog`), and other isolates' output.
+
+Turn it off with `captureOutput: false`, or `--dart-define=ZHARP_CAPTURE_OUTPUT=false`.
 
 ## Logs only
 
@@ -127,6 +160,7 @@ too (`exception.type` may read like `a5`); the frames are what the symbols resto
 | `sampleRate` | `1.0` | Share of traces kept; errors and logs are always sent |
 | `enabled` | `true` | e.g. `enabled: kReleaseMode` |
 | `captureErrors` | `true` | |
+| `captureOutput` | `true` (`ZHARP_CAPTURE_OUTPUT`) | `debugPrint`, `package:logging`; `print`/`logger`/stdout inside `Zharp.guard` — see above |
 | `reportSilentFlutterErrors` | `false` | |
 | `sessionTimeout` | 30 min | |
 | `debug` | `false` | |

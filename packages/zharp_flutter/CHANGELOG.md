@@ -1,3 +1,11 @@
+## Unreleased
+
+- `ZharpOptions.captureOutput` (on by default): `debugPrint` and `package:logging` are sent as
+  logs, and inside `Zharp.guard` also `print`, the `logger` package and `stdout`/`stderr` — each
+  line tied to the trace and screen it was written in, still printed as before, never sent twice
+  (Flutter's console dump of an error Zharp reported isn't sent again). See "Logs from what the
+  app prints" in the README.
+
 ## 0.2.0
 
 - `ZharpOptions.captureBodies`: request and response bodies on traced requests, off by default
