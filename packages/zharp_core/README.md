@@ -19,8 +19,9 @@ await zharp.close();
 
 ## Dart servers
 
-Every incoming request gets a SERVER span, `METHOD path` (or `METHOD route`), without the app
-calling `startSpan`:
+Every incoming request gets a SERVER span without the app calling `startSpan`, named `METHOD`
+(`GET`) — or `METHOD route` (`GET /users/<id>`) once the route is known — with the path in
+`url.path`:
 
 - **dart:io `HttpServer`** — wrap the handler you pass to `listen`:
 
@@ -47,8 +48,9 @@ Each span continues the caller's trace (`traceparent`) and carries its `session.
 `server.address`, `client.address`, `user_agent.original`. A 5xx, or an error the handler throws,
 fails the span; the error is reported, in the request's trace. `sampleRate` and the caller's
 sampled flag decide which traces are sent; lines are stamped either way. Name the route a
-request matched with `setRequestRoute('/users/<id>')` from the handler, so requests group by
-route rather than by path.
+request matched with `setRequestRoute('/users/<id>')` from the handler, so its span is named
+by route; without one, the span is just `GET` (a path full of ids would name every request
+differently).
 
 The handler runs with the request's span current: `zharp.log`, `startSpan`, traced outgoing
 requests (`ZharpHttpClient`, `zharp_dio`, which pass the trace on) and `setUser` — which names

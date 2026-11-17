@@ -106,7 +106,8 @@ void main() {
     expect(response.statusCode, 500);
     await settle();
     final span = backend.spans.single;
-    expect(span['name'], 'GET /boom');
+    expect(span['name'], 'GET');
+    expect(attributesOf(span)['url.path'], '/boom');
     expect(span['status']['code'], 2);
     expect(attributesOf(span), allOf(containsPair('http.response.status_code', 500), containsPair('error.type', 'StateError')));
     final error = backend.logs.single;

@@ -41,8 +41,9 @@ Start Zharp in a custom entrypoint (`main.dart` with `run`) before `serve`.
 
 ## What each request gets
 
-- A SERVER span `METHOD path`; call `setRequestRoute('/users/<id>')` in the handler and it becomes
-  `GET /users/<id>` with `http.route` (shelf_router doesn't tell middleware which route matched).
+- A SERVER span named `METHOD` (`GET`), the path in `url.path`; call
+  `setRequestRoute('/users/<id>')` in the handler and it becomes `GET /users/<id>` with
+  `http.route` (shelf_router doesn't tell middleware which route matched).
 - The caller's trace from `traceparent`, and its `session.id`/`enduser.id` from `baggage`.
 - `http.request.method`, `url.path`, `url.query` (secret-looking values `[Filtered]`),
   `http.response.status_code`, `server.address`, `client.address`, `user_agent.original`.

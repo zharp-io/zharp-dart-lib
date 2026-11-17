@@ -14,7 +14,7 @@ import 'server.dart';
 /// }));
 /// ```
 ///
-/// Each request gets a SERVER span `METHOD path` that continues the caller's trace
+/// Each request gets a SERVER span `METHOD` (`METHOD route` after `setRequestRoute`) that continues the caller's trace
 /// (`traceparent`, `baggage`) and ends when the response is done, with its status — an error for
 /// 5xx. The handler runs with that span current, so `zharp.log`, `startSpan`, traced outgoing
 /// requests and `setUser` belong to the request, and every line it prints ends with the request's

@@ -13,7 +13,7 @@ import 'package:zharp_core/zharp_core.dart' show runCapturingOutput;
 
 export 'package:zharp_core/server.dart' show setRequestRoute;
 
-/// A SERVER span per request: `METHOD path` — `METHOD route` once the handler names its route
+/// A SERVER span per request: `METHOD` — `METHOD route` once the handler names its route
 /// with [setRequestRoute] — continuing the caller's trace (`traceparent`) with its `session.id`
 /// and `enduser.id` (`baggage`), ended with the response's status (an error for 5xx).
 ///

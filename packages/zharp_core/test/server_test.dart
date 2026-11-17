@@ -82,7 +82,9 @@ void main() {
     await settle(zharp);
 
     final spans = backend.spans;
-    expect([for (final s in spans) s['name']], ['GET /orders', 'GET /missing']);
+    // No route known: named by the method alone; the path is an attribute.
+    expect([for (final s in spans) s['name']], ['GET', 'GET']);
+    expect([for (final s in spans) attributesOf(s)['url.path']], ['/orders', '/missing']);
     final first = spans.first;
     expect(first['kind'], SpanKind.server.code);
     expect(first['parentSpanId'], anyOf(isNull, isEmpty));
@@ -97,6 +99,19 @@ void main() {
     expect(a.containsKey('session.id'), isFalse, reason: 'a server has no session of its own');
     // A 404 is the caller's failure, not the server's.
     expect(spans.last['status']?['code'], isNot(2));
+  });
+
+  test('setRequestRoute names the span METHOD route', () async {
+    final zharp = start();
+    await serve((request) async {
+      setRequestRoute('/orders/<id>');
+      await request.response.close();
+    });
+    await get('/orders/123');
+    await settle(zharp);
+    final span = backend.spans.single;
+    expect(span['name'], 'GET /orders/<id>');
+    expect(attributesOf(span), allOf(containsPair('http.route', '/orders/<id>'), containsPair('url.path', '/orders/123')));
   });
 
   test("continues the caller's trace; baggage's session and user are on the span and logs", () async {
@@ -201,9 +216,9 @@ void main() {
     await a;
     await settle(zharp);
 
-    final spans = {for (final s in backend.spans) s['name']: s};
+    final spans = {for (final s in backend.spans) attributesOf(s)['url.path']: s};
     for (final who in ['a', 'b']) {
-      final span = spans['GET /$who']!;
+      final span = spans['/$who']!;
       expect(attributesOf(span)['enduser.id'], who);
       final line = printed.singleWhere((l) => l.startsWith('done $who'));
       expect(_stamp.firstMatch(line)!.group(2), span['spanId']);
@@ -229,10 +244,13 @@ void main() {
     await get('/front');
     await settle(zharp);
     client.close();
-    final byName = {for (final s in backend.spans) s['name'] as String: s};
-    final front = byName['GET /front']!;
-    final call = byName.entries.firstWhere((e) => e.value['kind'] == SpanKind.client.code).value;
-    final back = byName['GET /back']!;
+    final byPath = {
+      for (final s in backend.spans)
+        if (s['kind'] == SpanKind.server.code) attributesOf(s)['url.path']: s,
+    };
+    final front = byPath['/front']!;
+    final call = backend.spans.firstWhere((s) => s['kind'] == SpanKind.client.code);
+    final back = byPath['/back']!;
     expect(call['parentSpanId'], front['spanId']);
     expect(back['parentSpanId'], call['spanId']);
     expect({front['traceId'], call['traceId'], back['traceId']}, hasLength(1));

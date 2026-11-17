@@ -143,7 +143,7 @@ class ServerRequest {
   }
 }
 
-/// Start tracing an incoming request: a SERVER span named `METHOD path` (or `METHOD route` when
+/// Start tracing an incoming request: a SERVER span named `METHOD` (`METHOD route` when
 /// [route] is known) that continues the caller's trace from its `traceparent`, with its
 /// `session.id` and `enduser.id` from `baggage`. [header] reads a request header by its
 /// lower-case name. Null before Zharp starts.
@@ -177,7 +177,9 @@ ServerRequest? startServerSpan({
       // Started inside the request's zone, so it carries the request's context, not the process's.
       span = runZoned(
         () => core.tracer.start(
-          '$verb ${route ?? path}',
+          // No route known: just the method — a path with ids in it would name every request
+          // differently (OpenTelemetry's convention). `url.path` keeps the path.
+          route == null ? verb : '$verb $route',
           kind: SpanKind.server,
           root: true,
           remoteParent: parent,
@@ -201,7 +203,7 @@ ServerRequest? startServerSpan({
         traceId: parent.traceId,
         spanId: parent.spanId,
         parentSpanId: null,
-        name: '$verb $path',
+        name: verb,
         kind: SpanKind.server,
         sampled: false,
         startMicros: 0,
