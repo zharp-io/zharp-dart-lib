@@ -39,6 +39,8 @@ export 'src/output.dart'
         rememberSent,
         resetOutputCapture,
         runCapturingOutput,
+        stampLine,
+        switchOn,
         stripAnsi;
 export 'src/otlp.dart' show Severity, SpanKind, SpanStatusCode;
 export 'src/propagation.dart' show formatTraceparent, parseTraceparent, formatBaggage, parseBaggage, shouldPropagate;

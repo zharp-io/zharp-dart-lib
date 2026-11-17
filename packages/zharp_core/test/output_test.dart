@@ -46,12 +46,15 @@ void main() {
     hierarchicalLoggingEnabled = false;
   });
 
-  ZharpCore start({bool captureOutput = true, bool debug = false}) => ZharpCore.start(ZharpOptions(
+  ZharpCore start({bool? logs = true, bool captureOutput = true, bool debug = false, bool? logCorrelation}) =>
+      ZharpCore.start(ZharpOptions(
         key: 'zpk_test',
         service: 'api',
         endpoint: 'https://ingest.test/api/v1/otlp',
         httpClient: backend.client,
+        logs: logs,
         captureOutput: captureOutput,
+        logCorrelation: logCorrelation,
         debug: debug,
       ))!;
 
@@ -257,6 +260,120 @@ void main() {
       expect(await sent(zharp), isEmpty);
       expect(printed, ['hello']);
       expect(out.text.toString(), 'world\n');
+    });
+  });
+
+  group('logs off (the default)', () {
+    test('nothing logged or printed is sent; errors and zharp.log still are', () async {
+      final zharp = start(logs: null);
+      expect(zharp.sendsLogs, isFalse);
+      await app(() {
+        print('hello');
+        stdout.writeln('world');
+        stderr.writeln('ERROR on stderr');
+        Logger('x').severe('through logging');
+        zharp.log.info('explicit log');
+        zharp.captureError(StateError('broken'), stackTrace: StackTrace.current);
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      final logs = await sent(zharp);
+      expect(bodies(logs), ['explicit log', 'Bad state: broken']);
+      expect(attributesOf(logs.last)['exception.type'], 'StateError');
+      expect(printed, ['hello']);
+      expect(out.text.toString(), 'world\n');
+    });
+
+    test('logs: false wins over nothing; true turns capture on', () {
+      expect(start(logs: false).capturesOutput, isFalse);
+      expect(start(logs: true).capturesOutput, isTrue);
+      expect(start(logs: true, captureOutput: false).capturesOutput, isFalse);
+    });
+  });
+
+  group('stamping (servers)', () {
+    final pattern = RegExp(r'\s*\btrace_id=([0-9a-f]{32})\s+span_id=([0-9a-f]{16})\s*$', caseSensitive: false);
+
+    test('a line printed in a span ends with its ids; outside a span it is unchanged', () async {
+      final zharp = start(logs: null);
+      late ZharpSpan span;
+      await app(() async {
+        print('before any request');
+        await zharp.startSpan('GET /orders', (s) async {
+          span = s;
+          print('loading orders');
+          stdout.writeln('rows: 3');
+          stdout.write('partial ');
+          stdout.write('line\n');
+          stderr.writeln('slow query');
+          stdout.add(utf8.encode('bytes line\n'));
+          print('first\nsecond');
+        });
+        stdout.writeln('after the request');
+      });
+      final ids = 'trace_id=${span.traceId} span_id=${span.spanId}';
+      expect(printed, ['before any request', 'loading orders $ids', 'first $ids\nsecond $ids']);
+      expect(out.text.toString(),
+          'rows: 3 $ids\npartial line $ids\nbytes line $ids\nafter the request\n');
+      expect(err.text.toString(), 'slow query $ids\n');
+      final match = pattern.firstMatch(printed[1])!;
+      expect(match.group(1), span.traceId);
+      expect(match.group(2), span.spanId);
+      expect(span.traceId, matches(RegExp(r'^[0-9a-f]{32}$')));
+      // Logs are off: nothing printed was sent.
+      expect(await sent(zharp), isEmpty);
+    });
+
+    test('a JSON line gets trace_id and span_id fields and stays valid JSON', () async {
+      final zharp = start(logs: null);
+      late ZharpSpan span;
+      await app(() => zharp.startSpan('job', (s) {
+            span = s;
+            stdout.writeln('{"level":"info","msg":"done","n":2}');
+            print('{}');
+          }));
+      final record = jsonDecode(out.text.toString().trim()) as Map<String, dynamic>;
+      expect(record, {'level': 'info', 'msg': 'done', 'n': 2, 'trace_id': span.traceId, 'span_id': span.spanId});
+      expect(jsonDecode(printed.single), {'trace_id': span.traceId, 'span_id': span.spanId});
+    });
+
+    test('lines with a trace_id already, and the SDK\'s own, are left alone', () {
+      const t = '0af7651916cd43dd8448eb211c80319c';
+      const s = 'b7ad6b7169203331';
+      expect(stampLine('x trace_id=abc', t, s), 'x trace_id=abc');
+      expect(stampLine('[Zharp] started', t, s), '[Zharp] started');
+      expect(stampLine('', t, s), '');
+      expect(stampLine('done\r', t, s), 'done trace_id=$t span_id=$s\r');
+      expect(stampLine('tail of a record}', t, s), 'tail of a record}');
+    });
+
+    test('logs on: the line is sent without the stamp and printed with it', () async {
+      final zharp = start();
+      late ZharpSpan span;
+      await app(() => zharp.startSpan('job', (s) {
+            span = s;
+            print('working');
+          }));
+      final log = (await sent(zharp)).single;
+      expect(log['body']['stringValue'], 'working');
+      expect(log['spanId'], span.spanId);
+      expect(printed.single, 'working trace_id=${span.traceId} span_id=${span.spanId}');
+    });
+
+    test('logCorrelation: false prints every line unchanged', () async {
+      final zharp = start(logs: null, logCorrelation: false);
+      await app(() => zharp.startSpan('job', (s) {
+            print('working');
+            stdout.writeln('more');
+          }));
+      expect(printed, ['working']);
+      expect(out.text.toString(), 'more\n');
+    });
+
+    test('switchOn: option, then environment / define, then the default', () {
+      expect(switchOn(true, 'ZHARP_NOT_SET', 'false', fallback: false), isTrue);
+      expect(switchOn(null, 'ZHARP_NOT_SET', 'yes', fallback: false), isTrue);
+      expect(switchOn(null, 'ZHARP_NOT_SET', 'off', fallback: true), isFalse);
+      expect(switchOn(null, 'ZHARP_NOT_SET', '', fallback: true), isTrue);
     });
   });
 

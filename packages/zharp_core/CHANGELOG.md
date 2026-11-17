@@ -1,9 +1,17 @@
 ## Unreleased
 
-- `ZharpOptions.captureOutput` (on by default; `ZHARP_CAPTURE_OUTPUT=false` turns it off): what
-  the program prints is sent as logs, tied to the span it was written in, still printed as before.
-  `package:logging` records always, with their level and `log.logger`; inside `ZharpCore.run`,
-  `print` and `stdout`/`stderr` too. The level is read from the line (JSON `level`, `ERROR`,
+- `ZharpOptions.logs` (`ZHARP_LOGS`), **off by default**: nothing the program logs or prints is
+  sent unless it is on. On a server the Zharp agent reads the program's output and brings those
+  lines in; sending them from the SDK too made every line arrive twice. Errors, traces, sessions
+  and `zharp.log` calls are sent either way.
+- `ZharpOptions.logCorrelation` (`ZHARP_LOG_CORRELATION`), on by default, Dart servers and tools
+  only: inside `ZharpCore.run`, every line printed during a span ends with
+  ` trace_id=<32 hex> span_id=<16 hex>` (a JSON line gets the two as fields), so Zharp links the
+  agent's copy to its request. Lines outside a span or already carrying a trace_id are unchanged.
+- `ZharpCore.run(body)`, and with logs on, `ZharpOptions.captureOutput` (on by default;
+  `ZHARP_CAPTURE_OUTPUT=false` turns it off): what the program prints is sent as logs, tied to
+  the span it was written in, still printed as before. `package:logging` records with their
+  level and `log.logger`; inside `ZharpCore.run`, `print` and `stdout`/`stderr` too. The level is read from the line (JSON `level`, `ERROR`,
   `[warn]`, `level=error`, `SEVERE`, the `logger` package's `[E]`/emoji — its boxes become one
   record), else info, or warning on stderr. Lines are capped at 32 KB, colour codes dropped, an
   unfinished line sent after 200 ms, and a line already sent is never sent twice.

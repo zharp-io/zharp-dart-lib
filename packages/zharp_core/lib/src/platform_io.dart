@@ -44,14 +44,21 @@ String? environmentValue(String name) {
   return value == null || value.isEmpty ? null : value;
 }
 
+/// Lines printed on a server can be stamped with their request's ids (Flutter turns it off).
+const bool canStampOutput = true;
+
 /// Run [body] with `stdout` and `stderr` replaced by ones that hand each write to [capture] and
-/// then write it exactly as before.
-R runWithCapturedStdio<R>(R Function() body, void Function(String chunk, {required bool isError}) capture) {
+/// then write it as before — through [stamp], which may add the request's ids to its lines.
+R runWithCapturedStdio<R>(
+  R Function() body,
+  void Function(String chunk, {required bool isError}) capture,
+  String Function(String chunk) stamp,
+) {
   final Stdout out;
   final Stdout err;
   try {
-    out = _CapturedStdout(stdout, (chunk) => capture(chunk, isError: false));
-    err = _CapturedStdout(stderr, (chunk) => capture(chunk, isError: true));
+    out = _CapturedStdout(stdout, (chunk) => capture(chunk, isError: false), stamp);
+    err = _CapturedStdout(stderr, (chunk) => capture(chunk, isError: true), stamp);
   } catch (_) {
     return body();
   }
@@ -60,10 +67,23 @@ R runWithCapturedStdio<R>(R Function() body, void Function(String chunk, {requir
 
 /// A `Stdout` that copies what is written to [_take] and passes every call to [_inner].
 class _CapturedStdout implements Stdout {
-  _CapturedStdout(this._inner, this._take);
+  _CapturedStdout(this._inner, this._take, this._stamp);
 
   final Stdout _inner;
   final void Function(String chunk) _take;
+  final String Function(String chunk) _stamp;
+
+  /// [data] with its lines stamped, or [data] itself when nothing changes or it isn't UTF-8.
+  List<int> _stampBytes(List<int> data) {
+    try {
+      if (!data.contains(10)) return data;
+      final text = utf8.decode(data);
+      final stamped = _stamp(text);
+      return identical(stamped, text) ? data : utf8.encode(stamped);
+    } catch (_) {
+      return data;
+    }
+  }
 
   late final ByteConversionSink _bytes =
       const Utf8Decoder(allowMalformed: true).startChunkedConversion(_ChunkSink(_copy));
@@ -84,21 +104,22 @@ class _CapturedStdout implements Stdout {
   void write(Object? object) {
     final text = '$object';
     _copy(text);
-    _inner.write(text);
+    _inner.write(_stamp(text));
   }
 
   @override
   void writeln([Object? object = '']) {
     final text = '$object';
     _copy('$text\n');
-    _inner.writeln(text);
+    final stamped = _stamp('$text\n');
+    _inner.writeln(stamped.substring(0, stamped.length - 1));
   }
 
   @override
   void writeAll(Iterable<dynamic> objects, [String separator = '']) {
     final text = objects.join(separator);
     _copy(text);
-    _inner.write(text);
+    _inner.write(_stamp(text));
   }
 
   @override
@@ -110,13 +131,13 @@ class _CapturedStdout implements Stdout {
   @override
   void add(List<int> data) {
     _copyBytes(data);
-    _inner.add(data);
+    _inner.add(_stampBytes(data));
   }
 
   @override
   Future<dynamic> addStream(Stream<List<int>> stream) => _inner.addStream(stream.map((data) {
         _copyBytes(data);
-        return data;
+        return _stampBytes(data);
       }));
 
   @override

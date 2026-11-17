@@ -1,4 +1,5 @@
-/// Everything the app prints, as logs.
+/// Everything the app prints, as logs (with `ZharpOptions.logs` on), and the request ids stamped on
+/// printed lines (servers, `ZharpOptions.logCorrelation`).
 ///
 /// Dart code logs in many ways: `print`, Flutter's `debugPrint`, `package:logging`, the `logger`
 /// package (which prints), `stdout.writeln`, and libraries doing any of these. The captures here
@@ -446,13 +447,98 @@ final Object _captureZoneKey = Object();
 R runCapturingOutput<R>(R Function() body) {
   if (Zone.current[_captureZoneKey] == true) return body();
   return runZoned(
-    () => runWithCapturedStdio(body, captureChunk),
+    () => runWithCapturedStdio(body, captureChunk, stampChunk),
     zoneValues: {_captureZoneKey: true},
     zoneSpecification: ZoneSpecification(print: (self, parent, zone, line) {
-      parent.print(zone, line);
+      // Sent as written; printed with the request's ids.
       captureMessage(line, source: 'print', zone: zone);
+      var out = line;
+      try {
+        out = _stampText('$line\n', zone);
+        out = out.substring(0, out.length - 1);
+      } catch (_) {
+        out = line;
+      }
+      parent.print(zone, out);
     }),
   );
+}
+
+// ─── Stamping: the request's ids on each printed line ───────────────────────
+
+final RegExp _zeroIds = RegExp(r'^0+$');
+
+/// [chunk] with every complete line in it (ending in a newline) stamped with the ids of the span
+/// current in [zone] — when stamping is on and a span is active; otherwise [chunk] itself.
+String _stampText(String chunk, Zone? zone) {
+  final core = ZharpCore.instance;
+  if (core == null || !core.stampsLines || _isQuiet || !chunk.contains('\n')) return chunk;
+  final value = (zone ?? Zone.current)[spanZoneKey];
+  final span = value is ZharpSpan ? value : core.tracer.ambient?.span;
+  if (span == null || span.isEnded || _zeroIds.hasMatch(span.traceId)) return chunk;
+  final parts = chunk.split('\n');
+  var changed = false;
+  for (var i = 0; i < parts.length - 1; i++) {
+    final next = stampLine(parts[i], span.traceId, span.spanId);
+    if (!identical(next, parts[i])) {
+      parts[i] = next;
+      changed = true;
+    }
+  }
+  return changed ? parts.join('\n') : chunk;
+}
+
+/// A chunk written to `stdout`/`stderr`, stamped (see [stampLine]) when a span is active.
+String stampChunk(String chunk) {
+  try {
+    return _stampText(chunk, Zone.current);
+  } catch (_) {
+    // An unstamped line is better than a lost one.
+    return chunk;
+  }
+}
+
+/// [line] ending with ` trace_id=<traceId> span_id=<spanId>`; a JSON record gets the two as
+/// fields instead. Blank lines, lines already carrying a trace_id and the SDK's own are returned
+/// as they are.
+String stampLine(String line, String traceId, String spanId) {
+  final cr = line.endsWith('\r') ? '\r' : '';
+  final body = cr.isEmpty ? line : line.substring(0, line.length - 1);
+  final trimmed = body.trimRight();
+  if (trimmed.trim().isEmpty || body.contains('trace_id') || body.contains('[Zharp]')) return line;
+  final traceHex = traceId.toLowerCase();
+  final spanHex = spanId.toLowerCase();
+  final rest = body.substring(trimmed.length);
+  if (trimmed.endsWith('}')) {
+    // A JSON record gets fields; the tail of a record written in pieces is left as it is.
+    if (!trimmed.trimLeft().startsWith('{')) return line;
+    final close = trimmed.lastIndexOf('}');
+    final inner = trimmed.substring(trimmed.indexOf('{') + 1, close).trim();
+    final fields = '"trace_id":"$traceHex","span_id":"$spanHex"';
+    return '${trimmed.substring(0, close)}${inner.isEmpty ? '' : ','}$fields}$rest$cr';
+  }
+  return '$trimmed trace_id=$traceHex span_id=$spanHex$rest$cr';
+}
+
+/// An on/off setting: [option] when given, else the environment variable [name], else the
+/// `--dart-define` value [defined], else [fallback]. `true`/`1`/`yes`/`on` and
+/// `false`/`0`/`no`/`off`.
+bool switchOn(bool? option, String name, String defined, {required bool fallback}) {
+  if (option != null) return option;
+  for (final candidate in [_environment(name), defined]) {
+    final value = candidate?.trim().toLowerCase() ?? '';
+    if (const ['true', '1', 'yes', 'on'].contains(value)) return true;
+    if (const ['false', '0', 'no', 'off'].contains(value)) return false;
+  }
+  return fallback;
+}
+
+String? _environment(String name) {
+  try {
+    return environmentValue(name);
+  } catch (_) {
+    return null;
+  }
 }
 
 // ─── package:logging ────────────────────────────────────────────────────────

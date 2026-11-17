@@ -39,7 +39,8 @@ abstract final class Zharp {
     try {
       WidgetsFlutterBinding.ensureInitialized();
       _unhook();
-      final core = ZharpCore.start(options);
+      // No agent reads a phone's output: lines are never stamped.
+      final core = ZharpCore.start(options, stampLines: false);
       if (core == null) return;
       // Device details come from native code. Startup waits for them only briefly — a cold
       // emulator can take seconds to answer — and they join the resource whenever they arrive.

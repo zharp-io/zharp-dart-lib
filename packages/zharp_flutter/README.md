@@ -33,8 +33,8 @@ Zharp.clearUser();
   `Zharp.guard(() async { await Zharp.init(…); runApp(…); })`.
 - **Caught errors** — `Zharp.captureError(error, stackTrace: stack, attributes: {…})`, as handled.
 - **Logs** — `Zharp.log.debug/info/warn/error('message', {'key': value})`, tied to the current
-  trace; and what the app already logs — `debugPrint`, `package:logging`, and inside
-  `Zharp.guard` also `print` and the `logger` package (see below).
+  trace. What the app already logs and prints (`debugPrint`, `package:logging`, `print`, the
+  `logger` package) is sent only when you turn logs on — see below.
 - **Screen views** — add `ZharpNavigatorObserver()` to `navigatorObservers` (or go_router's
   `observers`). Each named page route becomes a root span `screen <name>` that lasts until the
   screen is drawn and its requests have finished; everything recorded meanwhile carries
@@ -56,8 +56,15 @@ your app; it prints one warning if the key is rejected (`debug: true` prints mor
 
 ## Logs from what the app prints
 
-You don't have to move your logging to `Zharp.log`. With `captureOutput` (on by default) what the
-app already logs is sent too, each line tied to the trace, span, screen and session it was
+Off by default: unless you turn logs on, nothing the app logs or prints is sent. Errors, traces,
+sessions and `Zharp.log` calls are sent either way. To send the app's logs:
+
+```dart
+await Zharp.init(ZharpOptions(key: 'zpk_…', service: 'shop-app', logs: true));
+```
+
+(or `--dart-define=ZHARP_LOGS=true`). Then you don't have to move your logging to `Zharp.log`:
+what the app already logs is sent, each line tied to the trace, span, screen and session it was
 written in, and still printed exactly as before:
 
 | Written with | Sent |
@@ -68,7 +75,7 @@ written in, and still printed exactly as before:
 
 ```dart
 void main() => Zharp.guard(() async {
-  await Zharp.init(ZharpOptions(key: 'zpk_…', service: 'shop-app'));
+  await Zharp.init(ZharpOptions(key: 'zpk_…', service: 'shop-app', logs: true));
   runApp(const MyApp());
 });
 ```
@@ -83,7 +90,8 @@ itself (`[Zharp] …`) are left out.
 Not captured: `dart:developer`'s `log()` (it goes to the debugger, not through anything an app
 can hook), native Android/iOS logs (logcat, `os_log`, `NSLog`), and other isolates' output.
 
-Turn it off with `captureOutput: false`, or `--dart-define=ZHARP_CAPTURE_OUTPUT=false`.
+With logs on, `captureOutput: false` (or `--dart-define=ZHARP_CAPTURE_OUTPUT=false`) sends only
+`Zharp.log` calls.
 
 ## Logs only
 
@@ -153,14 +161,14 @@ too (`exception.type` may read like `a5`); the frames are what the symbols resto
 |---|---|---|
 | `key` | — | Required. |
 | `service`, `environment`, `release` | | `service.name`, `deployment.environment.name`, `service.version` |
-| `endpoint` | `https://api.zharp.io/api/v1/otlp` | |
 | `tracing` | `true` | `false` = logs only (see above) |
 | `tracingOrigins` | `[]` | Hosts (`api.example.com`, `*.example.com`), origins, or `RegExp`s |
 | `captureBodies` | off | `CaptureBodies()` or `CaptureBodies.all()` — see above |
 | `sampleRate` | `1.0` | Share of traces kept; errors and logs are always sent |
 | `enabled` | `true` | e.g. `enabled: kReleaseMode` |
 | `captureErrors` | `true` | |
-| `captureOutput` | `true` (`ZHARP_CAPTURE_OUTPUT`) | `debugPrint`, `package:logging`; `print`/`logger`/stdout inside `Zharp.guard` — see above |
+| `logs` | `false` (`ZHARP_LOGS`) | Send what the app logs and prints — see above |
+| `captureOutput` | `true` (`ZHARP_CAPTURE_OUTPUT`) | With `logs` on: `debugPrint`, `package:logging`; `print`/`logger`/stdout inside `Zharp.guard` |
 | `reportSilentFlutterErrors` | `false` | |
 | `sessionTimeout` | 30 min | |
 | `debug` | `false` | |
@@ -169,7 +177,7 @@ too (`exception.type` may read like `a5`); the frames are what the symbols resto
 
 ```bash
 flutter pub get && flutter test
-cd example && flutter run --dart-define=ZHARP_KEY=zpk_… --dart-define=ZHARP_ENDPOINT=http://10.0.2.2:3000/api/v1/otlp
+cd example && flutter run --dart-define=ZHARP_KEY=zpk_…
 ```
 
 The engine — OTLP encoding, batching, sessions, propagation — is the pure-Dart

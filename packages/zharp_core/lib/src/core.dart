@@ -52,6 +52,7 @@ class ZharpCore {
     Map<String, Object?> resourceAttributes = const {},
     String? defaultRelease,
     DateTime Function()? clock,
+    bool stampLines = true,
   }) {
     final previous = _instance;
     _instance = null;
@@ -100,6 +101,10 @@ class ZharpCore {
       ownsClient,
       now,
     );
+    core.stampsLines = stampLines &&
+        canStampOutput &&
+        switchOn(options.logCorrelation, 'ZHARP_LOG_CORRELATION', const String.fromEnvironment('ZHARP_LOG_CORRELATION'),
+            fallback: true);
     _instance = core;
     if (core.capturesOutput) core._stopLogging = captureLoggingRecords();
     if (options.debug) {
@@ -120,15 +125,24 @@ class ZharpCore {
   late final Tracer tracer;
   late final ZharpLog log;
 
-  /// Whether what the app prints is sent as logs ([ZharpOptions.captureOutput], unless
-  /// `ZHARP_CAPTURE_OUTPUT=false`).
-  late final bool capturesOutput = options.captureOutput && outputCaptureAllowed();
+  /// Whether what the app logs and prints is sent ([ZharpOptions.logs] or `ZHARP_LOGS`; off by
+  /// default).
+  late final bool sendsLogs =
+      switchOn(options.logs, 'ZHARP_LOGS', const String.fromEnvironment('ZHARP_LOGS'), fallback: false);
+
+  /// Whether what the app prints is sent as logs: [sendsLogs], and [ZharpOptions.captureOutput]
+  /// unless `ZHARP_CAPTURE_OUTPUT=false`.
+  late final bool capturesOutput = sendsLogs && options.captureOutput && outputCaptureAllowed();
+
+  /// Whether lines printed inside [run] during a span end with its trace_id and span_id
+  /// ([ZharpOptions.logCorrelation]; Dart servers and tools only).
+  bool stampsLines = false;
   void Function()? _stopLogging;
 
-  /// Run [body] where `print` and writes to `stdout` and `stderr` are also sent as logs (with
-  /// [ZharpOptions.captureOutput], the default) — for Dart servers and command-line tools.
-  /// Everything is still printed as before; errors and the return value are [body]'s own. Start
-  /// Zharp inside it or before it:
+  /// Run [body] — a Dart server or command-line tool — where every line printed (`print`,
+  /// `stdout`, `stderr`) during a span ends with its `trace_id` and `span_id`
+  /// ([ZharpOptions.logCorrelation]), and, with [ZharpOptions.logs] on, is also sent as a log.
+  /// Errors and the return value are [body]'s own. Start Zharp inside it or before it:
   ///
   /// ```dart
   /// void main() => ZharpCore.run(() async {

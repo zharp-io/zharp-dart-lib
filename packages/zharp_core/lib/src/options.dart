@@ -30,6 +30,8 @@ class ZharpOptions {
     this.httpClient,
     this.captureBodies,
     this.captureOutput = true,
+    this.logs,
+    this.logCorrelation,
   });
 
   /// The app's key from the Zharp dashboard, `zpk_…`. It can only send, so it is safe to ship in
@@ -45,7 +47,7 @@ class ZharpOptions {
   /// `service.version`, e.g. `shop-app@2.3.0+41`. Errors and traces are filtered by it.
   final String? release;
 
-  /// The OTLP endpoint. Defaults to [defaultEndpoint]; `/v1/traces` and `/v1/logs` are appended.
+  /// Leave unset: the SDK sends straight to Zharp. (Used for Zharp's own testing.)
   final String? endpoint;
 
   /// False is logs-only mode: logs, errors (uncaught and `captureError`), the user, session,
@@ -110,9 +112,23 @@ class ZharpOptions {
   /// body is sent as it is: add its keys to `redactKeys`.
   final CaptureBodies? captureBodies;
 
-  /// Send what the app prints as logs too, each line tied to the trace and session it was
-  /// written in. On by default; `false` — or `ZHARP_CAPTURE_OUTPUT=false` in the environment or
-  /// as a `--dart-define` — turns it off.
+  /// Send what the app logs and prints. **Off by default**: nothing the app logs or prints is
+  /// sent — on a server, the Zharp agent reads the app's output and brings those lines in,
+  /// linked to their request by [logCorrelation]. Errors, traces, sessions and `Zharp.log` calls
+  /// are sent either way. `true` — or `ZHARP_LOGS=true` in the environment or as a
+  /// `--dart-define` — turns it on, e.g. in an app, or a server without the agent.
+  final bool? logs;
+
+  /// Dart servers and command-line tools (not Flutter, not the web): every line printed inside
+  /// `ZharpCore.run` while a span is active ends with ` trace_id=<32 hex> span_id=<16 hex>` — or,
+  /// for a JSON line, gets `"trace_id"` and `"span_id"` fields — so a line the Zharp agent collects
+  /// is linked to its request. Lines outside a span and lines that already carry a `trace_id`
+  /// are left alone. On by default; `false` (or `ZHARP_LOG_CORRELATION=false`) turns it off.
+  final bool? logCorrelation;
+
+  /// With [logs] on: send what the app prints as logs, each line tied to the trace and session
+  /// it was written in. On by default; `false` — or `ZHARP_CAPTURE_OUTPUT=false` in the
+  /// environment or as a `--dart-define` — leaves only `Zharp.log` calls.
   ///
   /// - `package:logging` records, with their own level and logger name (`log.logger`).
   /// - Flutter's `debugPrint` (zharp_flutter), which Flutter and many packages log through.

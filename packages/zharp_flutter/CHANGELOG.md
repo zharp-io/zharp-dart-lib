@@ -1,7 +1,10 @@
 ## Unreleased
 
-- `ZharpOptions.captureOutput` (on by default): `debugPrint` and `package:logging` are sent as
-  logs, and inside `Zharp.guard` also `print`, the `logger` package and `stdout`/`stderr` — each
+- `ZharpOptions.logs` (`--dart-define=ZHARP_LOGS=true`), **off by default**: nothing the app
+  logs or prints is sent unless it is on. Errors, traces, sessions and `Zharp.log` calls are sent
+  either way. Lines are never stamped with trace ids in apps.
+- With logs on, `ZharpOptions.captureOutput` (on by default): `debugPrint` and `package:logging`
+  are sent as logs, and inside `Zharp.guard` also `print`, the `logger` package and `stdout`/`stderr` — each
   line tied to the trace and screen it was written in, still printed as before, never sent twice
   (Flutter's console dump of an error Zharp reported isn't sent again). See "Logs from what the
   app prints" in the README.

@@ -71,6 +71,7 @@ void main() {
           {String? release,
           bool captureErrors = true,
           bool tracing = true,
+          bool? logs,
           List<Pattern> tracingOrigins = const []}) =>
       ZharpOptions(
         key: 'zpk_test',
@@ -81,6 +82,7 @@ void main() {
         tracing: tracing,
         tracingOrigins: tracingOrigins,
         captureErrors: captureErrors,
+        logs: logs,
         httpClient: backend.client,
       );
 
@@ -360,7 +362,7 @@ void main() {
 
     test('debugPrint is sent at the level its line says, still printed, and put back on close', () async {
       final console = debugPrint;
-      await Zharp.init(options());
+      await Zharp.init(options(logs: true));
       expect(debugPrint, isNot(same(console)));
       late ZharpSpan span;
       Zharp.startSpan('checkout', (s) {
@@ -384,7 +386,7 @@ void main() {
       // Flutter's console dump (a test's presentError reports elsewhere).
       FlutterError.onError = (details) => FlutterError.dumpErrorToConsole(details, forceReport: true);
       try {
-        await Zharp.init(options());
+        await Zharp.init(options(logs: true));
         FlutterError.reportError(FlutterErrorDetails(exception: StateError('cart is empty'), library: 'widgets'));
         await Future<void>.delayed(Duration.zero);
         await Zharp.flush();
@@ -401,7 +403,7 @@ void main() {
       final done = Completer<void>();
       runZoned(
         () => Zharp.guard(() async {
-          await Zharp.init(options());
+          await Zharp.init(options(logs: true));
           print('Signed in');
           print('┌───────────');
           print('│ 💡 Feed refreshed');
@@ -419,10 +421,36 @@ void main() {
       expect(printed, hasLength(4));
     });
 
+    test('logs off by default: nothing logged or printed is sent, errors and Zharp.log are; no stamp', () async {
+      final console = debugPrint;
+      final done = Completer<void>();
+      runZoned(
+        () => Zharp.guard(() async {
+          await Zharp.init(options());
+          expect(debugPrint, same(console));
+          Zharp.startSpan('checkout', (_) {
+            print('Signed in');
+            debugPrint('Cart loaded');
+            Logger('feed').warning('stale cache');
+          });
+          Zharp.log.info('explicit');
+          Zharp.captureError(StateError('broken'), stackTrace: StackTrace.current);
+          done.complete();
+        }),
+        zoneSpecification: ZoneSpecification(print: (self, parent, zone, line) => printed.add(line)),
+      );
+      await done.future;
+      await Future<void>.delayed(Duration.zero);
+      await Zharp.flush();
+      expect(bodies(), ['explicit', 'Bad state: broken']);
+      // Printed as written: phones have no agent, so lines are never stamped.
+      expect(printed, ['Signed in', 'Cart loaded']);
+    });
+
     test('captureOutput: false leaves debugPrint alone', () async {
       final console = debugPrint;
       await Zharp.init(ZharpOptions(
-          key: 'zpk_test', endpoint: 'https://ingest.test/api/v1/otlp', httpClient: backend.client, captureOutput: false));
+          key: 'zpk_test', endpoint: 'https://ingest.test/api/v1/otlp', httpClient: backend.client, logs: true, captureOutput: false));
       expect(debugPrint, same(console));
       debugPrint('hello');
       await Zharp.flush();
