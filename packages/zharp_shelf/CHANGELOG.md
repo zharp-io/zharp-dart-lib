@@ -1,4 +1,4 @@
-## Unreleased
+## 0.1.0 - 2026-11-17
 
 - First release: `zharpMiddleware()` — a SERVER span per shelf (and dart_frog) request,
   continuing the caller's `traceparent` with its `baggage` session and user, failed on 5xx and

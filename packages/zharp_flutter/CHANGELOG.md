@@ -1,4 +1,6 @@
-## Unreleased
+## 0.3.0 - 2026-11-17
+
+- **Behaviour change:** logs are off unless `logs` is on (`ZHARP_LOGS=true`). On a server, lines printed during a request end with `trace_id=… span_id=…` and the Zharp agent brings them in; errors, traces and `Zharp.log` are sent as before.
 
 - `ZharpOptions.logs` (`--dart-define=ZHARP_LOGS=true`), **off by default**: nothing the app
   logs or prints is sent unless it is on. Errors, traces, sessions and `Zharp.log` calls are sent

@@ -1,3 +1,7 @@
+## 0.3.0 - 2026-11-17
+
+- Requires zharp_core 0.3.0. Dio calls made while handling a server request are children of that request's span. Logs are off unless `logs` is on.
+
 ## 0.2.0
 
 - `captureBodies`: request and response bodies on Dio spans — `data`, `FormData` (files
