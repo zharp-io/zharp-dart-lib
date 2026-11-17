@@ -234,8 +234,11 @@ ParsedLine parseLine(String raw) {
 // ─── The catch-all ───────────────────────────────────────────────────────────
 
 class _Entry {
-  _Entry(this.text, this.source, this.fallback, this.span, this.remember);
+  _Entry(this.text, this.source, this.fallback, this.span, this.remember, Zone? zone) : zone = zone ?? Zone.current;
   final String text;
+
+  /// Where it was written: the request it belongs to.
+  final Zone zone;
   final String source;
   final Severity fallback;
   final ZharpSpan? span;
@@ -290,6 +293,7 @@ void _send(_Entry entry) {
           ...parsed.attributes,
         },
         span: entry.span,
+        zone: entry.zone,
       ));
   if (entry.remember) rememberSent(text);
 }
@@ -310,10 +314,12 @@ class _Stream {
 
   String _pending = '';
   ZharpSpan? _pendingSpan;
+  Zone? _pendingZone;
   Timer? _lineTimer;
 
   List<String>? _box;
   ZharpSpan? _boxSpan;
+  Zone? _boxZone;
   Timer? _boxTimer;
 
   void _reset() {
@@ -327,7 +333,10 @@ class _Stream {
   void write(String chunk, ZharpSpan? span) {
     if (chunk.isEmpty) return;
     // A line belongs to the span it started in.
-    if (_pending.isEmpty) _pendingSpan = span;
+    if (_pending.isEmpty) {
+      _pendingSpan = span;
+      _pendingZone = Zone.current;
+    }
     _pending += chunk;
     if (!_pending.contains('\n')) {
       if (_pending.length > maxLineLength) {
@@ -340,9 +349,13 @@ class _Stream {
     final lines = _pending.split('\n');
     _pending = lines.removeLast();
     final lineSpan = _pendingSpan;
-    if (_pending.isNotEmpty) _pendingSpan = span;
+    final lineZone = _pendingZone;
+    if (_pending.isNotEmpty) {
+      _pendingSpan = span;
+      _pendingZone = Zone.current;
+    }
     for (final line in lines) {
-      this.line(line.endsWith('\r') ? line.substring(0, line.length - 1) : line, lineSpan);
+      this.line(line.endsWith('\r') ? line.substring(0, line.length - 1) : line, lineSpan, zone: lineZone);
     }
     _lineTimer?.cancel();
     _lineTimer = _pending.isEmpty ? null : Zone.root.createTimer(lineFlushDelay, _flushPending);
@@ -353,11 +366,11 @@ class _Stream {
     _lineTimer = null;
     final text = _pending;
     _pending = '';
-    if (text.isNotEmpty) line(text, _pendingSpan);
+    if (text.isNotEmpty) line(text, _pendingSpan, zone: _pendingZone);
   }
 
-  /// A whole line (or a whole `print`).
-  void line(String text, ZharpSpan? span, {bool remember = false}) {
+  /// A whole line (or a whole `print`), written in [zone].
+  void line(String text, ZharpSpan? span, {bool remember = false, Zone? zone}) {
     final plain = stripAnsi(text);
     final head = plain.trimLeft();
     if (_box != null) {
@@ -379,10 +392,11 @@ class _Stream {
     if (head.startsWith('┌') && !head.contains('\n')) {
       _box = [];
       _boxSpan = span;
+      _boxZone = zone ?? Zone.current;
       _armBox();
       return;
     }
-    _enqueue(_Entry(plain, source, fallback, span, remember));
+    _enqueue(_Entry(plain, source, fallback, span, remember, zone));
   }
 
   void _armBox() {
@@ -395,7 +409,7 @@ class _Stream {
     _boxTimer = null;
     final box = _box;
     _box = null;
-    if (box != null && box.isNotEmpty) _enqueue(_Entry(box.join('\n'), source, fallback, _boxSpan, false));
+    if (box != null && box.isNotEmpty) _enqueue(_Entry(box.join('\n'), source, fallback, _boxSpan, false, _boxZone));
   }
 
   /// Send what is waiting now.
@@ -417,7 +431,7 @@ bool get _capturing => !_isQuiet && (ZharpCore.instance?.capturesOutput ?? false
 void captureMessage(String? message, {required String source, Zone? zone, bool remember = false}) {
   try {
     if (message == null || !_capturing) return;
-    _stream(source, Severity.info).line(message, _spanIn(zone ?? Zone.current), remember: remember);
+    _stream(source, Severity.info).line(message, _spanIn(zone ?? Zone.current), remember: remember, zone: zone);
   } catch (_) {}
 }
 
@@ -578,7 +592,7 @@ void Function() captureLoggingRecords() {
         }
       }
       if (body.isEmpty && error != null) body = '$error';
-      quietly(() => core.log.emitCaptured(severity, body, attributes, span: _spanIn(record.zone)));
+      quietly(() => core.log.emitCaptured(severity, body, attributes, span: _spanIn(record.zone), zone: record.zone));
       rememberSent(body);
     } catch (_) {}
   });

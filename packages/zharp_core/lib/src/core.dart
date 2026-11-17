@@ -7,6 +7,7 @@ import 'options.dart';
 import 'output.dart';
 import 'platform.dart';
 import 'propagation.dart';
+import 'server.dart';
 import 'session.dart';
 import 'span.dart';
 import 'tracer.dart';
@@ -191,14 +192,20 @@ class ZharpCore {
     _guard(() {
       final trimmed = id.trim();
       if (trimmed.isEmpty) return clearUser();
-      _user = ZharpUser(id: trimmed, email: _nonBlank(email), name: _nonBlank(name));
+      final user = ZharpUser(id: trimmed, email: _nonBlank(email), name: _nonBlank(name));
+      // While handling a request (a server): that request's user, not the process's.
+      final scope = RequestScope.current;
+      if (scope != null) return scope.setUser(user);
+      _user = user;
     });
   }
 
   /// Forget the user (sign-out). Starts a new session, so the next person's activity isn't
-  /// joined to the last one's.
+  /// joined to the last one's. While handling a request, forgets only that request's user.
   void clearUser() {
     _guard(() {
+      final scope = RequestScope.current;
+      if (scope != null) return scope.setUser(null);
       _user = null;
       session.reset();
     });
@@ -220,7 +227,20 @@ class ZharpCore {
   String? get screen => _screen;
 
   /// The attributes on every span and log record: tags, the user, the session and the screen.
-  Map<String, Object> contextAttributes() {
+  ///
+  /// Inside a traced request ([zone] or the current one): the tags, the user `setUser` set for
+  /// that request (else the process's), and the caller's `session.id` / `enduser.id` from its
+  /// `baggage`, which win.
+  Map<String, Object> contextAttributes([Zone? zone]) {
+    final scope = RequestScope.of(zone ?? Zone.current);
+    if (scope != null) {
+      final user = scope.userSet ? scope.user : _user;
+      return {
+        ..._tags,
+        ...userAttributes(user),
+        ...scope.baggage,
+      };
+    }
     final user = _user;
     return {
       ..._tags,
@@ -331,10 +351,18 @@ class ZharpCore {
   Map<String, String> propagationHeaders(Uri url, ZharpSpan span, {String? existingBaggage}) {
     try {
       if (!options.tracing || isOwnEndpoint(url) || !shouldPropagate(url, options.tracingOrigins)) return const {};
-      final baggage = mergeBaggage(existingBaggage, {
-        'session.id': session.id,
-        'enduser.id': _user?.id,
-      });
+      final scope = RequestScope.current;
+      final baggage = mergeBaggage(
+          existingBaggage,
+          scope != null
+              ? {
+                  'session.id': scope.baggage['session.id'],
+                  'enduser.id': (scope.userSet ? scope.user : _user)?.id ?? scope.baggage['enduser.id'],
+                }
+              : {
+                  'session.id': session.id,
+                  'enduser.id': _user?.id,
+                });
       return {
         'traceparent': span.traceparent,
         if (baggage.isNotEmpty) 'baggage': baggage,
@@ -426,7 +454,7 @@ class ZharpLog {
     try {
       if (_core._closed) return;
       final body = _bodyOf(message);
-      _add(severity, body, attributes, _core.tracer.current);
+      _add(severity, body, attributes, _core.tracer.current, null);
       // If the app prints it too, that copy isn't sent again.
       rememberSent(body);
     } catch (_) {
@@ -436,19 +464,20 @@ class ZharpLog {
 
   /// A record from one of the output captures (`package:logging`, `print`, `debugPrint`,
   /// stdout), in [span] — the span current where it was written.
-  void emitCaptured(Severity severity, String body, Map<String, Object?> attributes, {ZharpSpan? span}) {
+  /// [zone] is where it was written, for the request it belongs to.
+  void emitCaptured(Severity severity, String body, Map<String, Object?> attributes, {ZharpSpan? span, Zone? zone}) {
     try {
       if (_core._closed) return;
-      _add(severity, body, attributes, span);
+      _add(severity, body, attributes, span, zone);
     } catch (_) {}
   }
 
-  void _add(Severity severity, String body, Map<String, Object?>? attributes, ZharpSpan? span) {
+  void _add(Severity severity, String body, Map<String, Object?>? attributes, ZharpSpan? span, Zone? zone) {
     _core._exporter.addLog(LogData(
       timeMicros: _core._clock().microsecondsSinceEpoch,
       severity: severity,
       body: body,
-      attributes: {..._core.contextAttributes(), ...sanitizeAttributes(attributes)},
+      attributes: {..._core.contextAttributes(zone), ...sanitizeAttributes(attributes)},
       traceId: span?.traceId,
       spanId: span?.spanId,
     ));

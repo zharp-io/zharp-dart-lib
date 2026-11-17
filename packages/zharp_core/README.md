@@ -17,9 +17,48 @@ await zharp.startSpan('import', (span) async { /* … */ });
 await zharp.close();
 ```
 
+## Dart servers
+
+Every incoming request gets a SERVER span, `METHOD path` (or `METHOD route`), without the app
+calling `startSpan`:
+
+- **dart:io `HttpServer`** — wrap the handler you pass to `listen`:
+
+  ```dart
+  import 'package:zharp_core/server.dart';
+
+  void main() => ZharpCore.run(() async {
+    ZharpCore.start(ZharpOptions(key: 'zpk_…', service: 'api'));
+    final server = await HttpServer.bind(InternetAddress.anyIPv4, 8080);
+    server.listen(zharpHandler((request) async {
+      request.response.write('ok');
+      await request.response.close();
+    }));
+  });
+  ```
+
+- **shelf, dart_frog** — [`zharp_shelf`](../zharp_shelf)'s `zharpMiddleware()`.
+- **Serverpod** — not covered yet: its endpoints don't run through shelf. Wrap work in
+  `zharp.startSpan` meanwhile.
+
+Each span continues the caller's trace (`traceparent`) and carries its `session.id` and
+`enduser.id` (`baggage`, sent by Zharp's browser SDK); `http.request.method`, `url.path`,
+`url.query` (secret-looking values `[Filtered]`), `http.response.status_code`, `http.route`,
+`server.address`, `client.address`, `user_agent.original`. A 5xx, or an error the handler throws,
+fails the span; the error is reported, in the request's trace. `sampleRate` and the caller's
+sampled flag decide which traces are sent; lines are stamped either way. Name the route a
+request matched with `setRequestRoute('/users/<id>')` from the handler, so requests group by
+route rather than by path.
+
+The handler runs with the request's span current: `zharp.log`, `startSpan`, traced outgoing
+requests (`ZharpHttpClient`, `zharp_dio`, which pass the trace on) and `setUser` — which names
+that request's user, not the process's — all belong to the request. Request bodies aren't
+captured (`captureBodies` covers outgoing requests only).
+
 ### Logs on a server
 
-Wrap the program in `ZharpCore.run`:
+Wrap the program in `ZharpCore.run`, as above (`zharpHandler` and `zharpMiddleware` also do it
+for each request):
 
 ```dart
 void main() => ZharpCore.run(() async {

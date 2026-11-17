@@ -46,14 +46,18 @@ class Tracer {
     bool root = false,
     Map<String, Object?>? attributes,
     DateTime? startTime,
+    ({String traceId, String spanId, bool sampled})? remoteParent,
   }) {
-    final parentSpan = root ? null : (parent ?? current);
-    final sampled = parentSpan?.sampled ?? (sampleRate >= 1 || (sampleRate > 0 && _random() < sampleRate));
+    final parentSpan = root || remoteParent != null ? null : (parent ?? current);
+    // A caller's decision (its traceparent's flag) is kept, as a parent's is.
+    final sampled = remoteParent?.sampled ??
+        parentSpan?.sampled ??
+        (sampleRate >= 1 || (sampleRate > 0 && _random() < sampleRate));
     final ids = idsFor(parentSpan);
     final span = ZharpSpan.internal(
-      traceId: ids.traceId,
+      traceId: remoteParent?.traceId ?? ids.traceId,
       spanId: ids.spanId,
-      parentSpanId: parentSpan?.spanId,
+      parentSpanId: remoteParent?.spanId ?? parentSpan?.spanId,
       name: name.isEmpty ? '(unnamed)' : name,
       kind: kind,
       sampled: sampled,

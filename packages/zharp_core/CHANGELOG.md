@@ -1,5 +1,12 @@
 ## Unreleased
 
+- Dart servers: a SERVER span per incoming request, without `startSpan`. `zharpHandler` (from
+  `package:zharp_core/server.dart`) wraps an HttpServer handler; `zharp_shelf` covers shelf and
+  dart_frog. The span continues the caller's `traceparent`, carries its `baggage` session and user,
+  OpenTelemetry's HTTP server attributes, and fails on 5xx or a thrown error (reported, in its
+  trace). The handler runs with the span current, so logs, child spans, outgoing requests,
+  `setUser` (per request) and the stamp on printed lines all belong to it. `setRequestRoute`
+  names the route. `sampleRate` and the caller's sampled flag apply; lines are stamped either way.
 - `ZharpOptions.logs` (`ZHARP_LOGS`), **off by default**: nothing the program logs or prints is
   sent unless it is on. On a server the Zharp agent reads the program's output and brings those
   lines in; sending them from the SDK too made every line arrive twice. Errors, traces, sessions

@@ -1,0 +1,4 @@
+# Develop against the zharp_core next door, not the published one.
+dependency_overrides:
+  zharp_core:
+    path: ../zharp_core
