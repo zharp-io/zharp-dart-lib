@@ -20,6 +20,7 @@ void main() {
           double sampleRate = 1.0,
           bool tracing = true,
           CaptureBodies? captureBodies,
+          bool captureHeaders = true,
           DateTime Function()? clock}) =>
       ZharpCore.start(
           clock: clock,
@@ -33,6 +34,8 @@ void main() {
             sampleRate: sampleRate,
             tracing: tracing,
             captureBodies: captureBodies,
+            captureHeaders: captureHeaders,
+            redactHeaders: const ['x-tenant'],
             httpClient: backend.client,
           ))!;
 
@@ -368,6 +371,32 @@ void main() {
       final missing = spans['GET cdn.other.test/missing']!;
       expect(missing['status']['code'], 2);
       expect(attrs(missing['attributes'] as List)['http.response.status_code'], 404);
+    });
+
+    test('headers by default: what went out and came back, secrets [Filtered]', () async {
+      final zharp = start(tracingOrigins: ['api.shop.test']);
+      final client = ZharpHttpClient(MockClient((request) async => http.Response('{}', 503,
+          headers: {'x-request-id': 'req-7', 'set-cookie': 'sid=secret', 'content-type': 'application/json'})));
+      await client.get(Uri.parse('https://api.shop.test/orders'),
+          headers: {'Authorization': 'Bearer user-token', 'X-Client': 'flutter', 'X-Tenant': 'acme'});
+      await zharp.flush();
+
+      final a = attrs(backend.spans.single['attributes'] as List);
+      expect(a['http.request.header.authorization'], '[Filtered]', reason: 'sent, but its value never leaves the device');
+      expect(a['http.request.header.x-client'], 'flutter');
+      expect(a['http.request.header.x-tenant'], '[Filtered]', reason: 'redactHeaders');
+      expect(a['http.request.header.traceparent'], matches(RegExp(r'^00-[0-9a-f]{32}-[0-9a-f]{16}-0[0-3]$')));
+      expect(a['http.response.header.x-request-id'], 'req-7');
+      expect(a['http.response.header.set-cookie'], '[Filtered]');
+      expect(a.containsKey('http.response.body'), isFalse, reason: 'no bodies without captureBodies');
+    });
+
+    test('captureHeaders: false records none', () async {
+      final zharp = start(captureHeaders: false);
+      await ZharpHttpClient(app).get(Uri.parse('https://api.shop.test/orders'), headers: {'X-Client': 'flutter'});
+      await zharp.flush();
+      final a = attrs(backend.spans.single['attributes'] as List);
+      expect(a.keys.where((k) => k.contains('.header.')), isEmpty);
     });
 
     test('a traceparent the app set is kept; its baggage is merged', () async {

@@ -1,5 +1,9 @@
 ## 0.3.0 - 2026-11-17
 
+## 0.4.0 - 2026-11-21
+
+- Request and response headers on HTTP client spans; secrets are sent as `[Filtered]`.
+
 - **Behaviour change:** logs are off unless `logs` is on (`ZHARP_LOGS=true`). On a server, lines printed during a request end with `trace_id=… span_id=…` and the Zharp agent brings them in; errors, traces and `Zharp.log` are sent as before.
 
 - Dart servers: a SERVER span per incoming request, without `startSpan`. `zharpHandler` (from

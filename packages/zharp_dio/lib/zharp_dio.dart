@@ -32,6 +32,10 @@ class ZharpDioInterceptor extends Interceptor {
           options.headers[name] = value;
         });
         options.extra[_key] = traced;
+        traced.recordHeaders('request', [
+          for (final entry in options.headers.entries)
+            if (entry.value != null) MapEntry(entry.key, '${entry.value}'),
+        ]);
       }
     } catch (_) {
       // Never fail a request because of monitoring.
@@ -57,6 +61,12 @@ class ZharpDioInterceptor extends Interceptor {
       final traced = options.extra.remove(_key);
       if (traced is HttpSpan) {
         if (error is DioException) traced.span.setAttribute('dio.exception.type', error.type.name);
+        if (response != null) {
+          traced.recordHeaders('response', [
+            for (final entry in response.headers.map.entries)
+              for (final value in entry.value) MapEntry(entry.key, value),
+          ]);
+        }
         var attributes = const <String, Object?>{};
         if (traced.wantsBodies(statusCode)) {
           final bodies = traced.bodies!;

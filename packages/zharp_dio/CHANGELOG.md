@@ -1,5 +1,9 @@
 ## 0.3.0 - 2026-11-17
 
+## 0.4.0 - 2026-11-21
+
+- Request and response headers on Dio spans; secrets are sent as `[Filtered]`.
+
 - Requires zharp_core 0.3.0. Dio calls made while handling a server request are children of that request's span. Logs are off unless `logs` is on.
 
 ## 0.2.0
