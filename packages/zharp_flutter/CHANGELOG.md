@@ -1,5 +1,11 @@
 ## 0.3.0 - 2026-11-17
 
+## 0.4.0 - 2026-11-21
+
+- Release builds can send: the package declares the INTERNET permission, so apps don't have to.
+- Request and response headers on `ZharpHttpClient` spans; secrets are sent as `[Filtered]`.
+- `dart-symbols upload` sends the app's sources with the symbols, so crashes show the code of that build.
+
 - **Behaviour change:** logs are off unless `logs` is on (`ZHARP_LOGS=true`). On a server, lines printed during a request end with `trace_id=… span_id=…` and the Zharp agent brings them in; errors, traces and `Zharp.log` are sent as before.
 
 - `ZharpOptions.logs` (`--dart-define=ZHARP_LOGS=true`), **off by default**: nothing the app
