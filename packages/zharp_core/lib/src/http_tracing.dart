@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'bodies.dart';
+import 'headers.dart';
 import 'core.dart';
 import 'otlp.dart';
 import 'span.dart';
@@ -27,7 +28,7 @@ String redactUrl(Uri url) {
 
 /// A traced outgoing request: its CLIENT span and the headers to add to it.
 class HttpSpan {
-  HttpSpan(this.span, this.headers, [this.bodies]);
+  HttpSpan(this.span, this.headers, [this.bodies, this.headerRedact]);
 
   final ZharpSpan span;
 
@@ -36,6 +37,20 @@ class HttpSpan {
 
   /// `traceparent` and `baggage` — empty when the host isn't in `tracingOrigins`.
   final Map<String, String> headers;
+
+  /// `captureHeaders`' extra secret names, or null when headers aren't recorded.
+  final List<Pattern>? headerRedact;
+
+  /// The headers that went out (`request`, the trace headers included) or came back (`response`).
+  void recordHeaders(String side, Iterable<MapEntry<String, String>> headers) {
+    final redact = headerRedact;
+    if (redact == null) return;
+    try {
+      span.setAttributes(headerAttributes(side, headers, redact));
+    } catch (_) {
+      // Never into the host app.
+    }
+  }
 
   /// Whether this request's bodies are kept, given its outcome (null status: no response).
   bool wantsBodies(int? statusCode) => bodies?.wanted(statusCode) ?? false;
@@ -93,7 +108,8 @@ HttpSpan? startHttpSpan(String method, Uri url, {Map<String, String> existingHea
     if (!headers.containsKey('traceparent')) headers.remove('baggage');
     final capture = core.options.captureBodies;
     final bodies = capture == null ? null : BodySettings(capture);
-    return HttpSpan(span, headers, bodies != null && bodies.allows(url) ? bodies : null);
+    return HttpSpan(span, headers, bodies != null && bodies.allows(url) ? bodies : null,
+        core.options.captureHeaders ? core.options.redactHeaders : null);
   } catch (_) {
     return null;
   }
@@ -123,6 +139,7 @@ class ZharpHttpClient extends http.BaseClient {
     } catch (_) {
       // A request already finalized can't take headers; it is still traced.
     }
+    traced.recordHeaders('request', request.headers.entries);
     final http.StreamedResponse response;
     try {
       response = await _inner.send(request);
@@ -130,6 +147,7 @@ class ZharpHttpClient extends http.BaseClient {
       traced.finish(error: error, attributes: traced.wantsBodies(null) ? _safely(() => _requestAttributes(request, traced.bodies!)) : const {});
       rethrow;
     }
+    traced.recordHeaders('response', response.headers.entries);
     if (!traced.wantsBodies(response.statusCode)) {
       traced.finish(statusCode: response.statusCode);
       return response;

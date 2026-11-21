@@ -30,6 +30,8 @@ class FakeAdapter implements HttpClientAdapter {
     }
     return ResponseBody.fromString(body, status, headers: {
       Headers.contentTypeHeader: [contentType],
+      'x-request-id': ['req-7'],
+      'set-cookie': ['sid=secret'],
     });
   }
 
@@ -93,6 +95,19 @@ void main() {
     expect(attrs(get)['http.response.status_code'], '200');
     expect(attrs(get)['http.request.method'], 'GET');
     expect(byName.containsKey('GET cdn.other.test/logo.png'), isTrue);
+  });
+
+  test('headers by default: what went out and came back, secrets [Filtered]', () async {
+    adapter.status = 503;
+    await dio.get<dynamic>('https://api.shop.test/orders',
+        options: Options(headers: {'Authorization': 'Bearer user-token', 'X-Client': 'flutter'}, validateStatus: (_) => true));
+    await ZharpCore.instance!.flush();
+    final a = attrs(spans().single);
+    expect(a['http.request.header.authorization'], '[Filtered]');
+    expect(a['http.request.header.x-client'], 'flutter');
+    expect(a['http.request.header.traceparent'], isNotNull, reason: 'the trace headers that went out');
+    expect(a['http.response.header.x-request-id'], 'req-7');
+    expect(a['http.response.header.set-cookie'], '[Filtered]');
   });
 
   test('HTTP errors and network failures end the span as an error; the app still gets them', () async {

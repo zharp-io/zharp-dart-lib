@@ -29,6 +29,8 @@ class ZharpOptions {
     this.maxQueueSize = 1000,
     this.httpClient,
     this.captureBodies,
+    this.captureHeaders = true,
+    this.redactHeaders = const [],
     this.captureOutput = true,
     this.logs,
     this.logCorrelation,
@@ -111,6 +113,15 @@ class ZharpOptions {
   /// described — `[file photo.png · image/png · 240 KB]` — never sent. Other personal data in a
   /// body is sent as it is: add its keys to `redactKeys`.
   final CaptureBodies? captureBodies;
+
+  /// Request and response headers on HTTP CLIENT spans (`http.request.header.*`,
+  /// `http.response.header.*`), so a failed request shows what was sent and what came back. On
+  /// by default. Secret headers (`authorization`, cookies, API keys, tokens…) are recorded as
+  /// `[Filtered]`; [redactHeaders] adds more names. False turns it off.
+  final bool captureHeaders;
+
+  /// More header names to record as `[Filtered]`, e.g. `['x-tenant']`.
+  final List<Pattern> redactHeaders;
 
   /// Send what the app logs and prints. **Off by default**: nothing the app logs or prints is
   /// sent — on a server, the Zharp agent reads the app's output and brings those lines in,
