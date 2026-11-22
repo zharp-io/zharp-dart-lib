@@ -1,6 +1,6 @@
 name: zharp_flutter
 description: Zharp Application Monitoring for Flutter — crashes and errors, logs, screen views, traced HTTP requests and sessions, sent as OpenTelemetry.
-version: 0.4.0
+version: 0.4.1
 homepage: https://zharp.io
 repository: https://github.com/zharp-io/zharp-dart-lib/tree/main/packages/zharp_flutter
 issue_tracker: https://github.com/zharp-io/zharp-dart-lib/issues
@@ -13,7 +13,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  zharp_core: ^0.4.0
+  flutter_web_plugins:
+    sdk: flutter
+  zharp_core: ^0.4.1
 
 dev_dependencies:
   flutter_lints: ^4.0.0
@@ -30,3 +32,6 @@ flutter:
         pluginClass: ZharpFlutterPlugin
       ios:
         pluginClass: ZharpFlutterPlugin
+      web:
+        pluginClass: ZharpFlutterWeb
+        fileName: src/web_plugin.dart

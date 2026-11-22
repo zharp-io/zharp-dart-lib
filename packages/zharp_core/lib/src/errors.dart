@@ -1,6 +1,10 @@
 /// Turning a Dart error and its stack into the `exception.*` attributes Zharp reads.
 library;
 
+import 'dart:async' show TimeoutException;
+
+import 'platform.dart' show debugIdAttributes;
+
 /// Frames from the SDK itself, left out of stacks the SDK had to capture on the caller's behalf.
 final RegExp _sdkFrame = RegExp(r'package:zharp_(core|flutter|dio)/');
 
@@ -75,6 +79,7 @@ class ExceptionDescription {
         'exception.stacktrace': stacktrace,
         'zharp.handled': handled ? 'true' : 'false',
         ...?build?.attributes(),
+        ...debugIdAttributes(stacktrace),
       };
 }
 
@@ -99,11 +104,37 @@ final RegExp _frameLine = RegExp(r'^\s*#\d+\s');
 String _typeOf(Object error) {
   try {
     final type = error.runtimeType.toString();
+    // A release web build renames classes (`minified:dn`): name what the error is instead.
+    if (type.startsWith('minified:')) return _minifiedTypeOf(error);
     // `Exception('x')` is a private _Exception; it reads best as what was written.
     return type == '_Exception' ? 'Exception' : type;
   } catch (_) {
     return 'Object';
   }
+}
+
+final RegExp _namePrefix = RegExp(r'^([A-Z][A-Za-z0-9_]*)(?::|$)');
+
+/// The type of an error whose class name was minified (dart2js release builds): the core error
+/// classes are recognised; anything else is named by its own text when that starts with a
+/// class-like name (`MyError: ...`), else as plain `Error` / `Exception`.
+String _minifiedTypeOf(Object error) {
+  if (error is RangeError) return 'RangeError';
+  if (error is ArgumentError) return 'ArgumentError';
+  if (error is StateError) return 'StateError';
+  if (error is UnimplementedError) return 'UnimplementedError';
+  if (error is UnsupportedError) return 'UnsupportedError';
+  if (error is FormatException) return 'FormatException';
+  if (error is ConcurrentModificationError) return 'ConcurrentModificationError';
+  if (error is TypeError) return 'TypeError';
+  if (error is NoSuchMethodError) return 'NoSuchMethodError';
+  if (error is AssertionError) return 'AssertionError';
+  if (error is StackOverflowError) return 'StackOverflowError';
+  if (error is OutOfMemoryError) return 'OutOfMemoryError';
+  if (error is TimeoutException) return 'TimeoutException';
+  final named = _namePrefix.firstMatch(error.toString().trimLeft());
+  if (named != null && named.group(1) != 'Exception') return named.group(1)!;
+  return error is Exception ? 'Exception' : 'Error';
 }
 
 String _messageOf(Object error) {

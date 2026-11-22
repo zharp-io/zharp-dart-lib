@@ -1,6 +1,6 @@
 name: zharp_core
 description: The engine behind zharp_flutter and zharp_dio — OTLP encoding, batching, sessions and trace propagation for Zharp Application Monitoring. Flutter apps add zharp_flutter instead.
-version: 0.4.0
+version: 0.4.1
 homepage: https://zharp.io
 repository: https://github.com/zharp-io/zharp-dart-lib/tree/main/packages/zharp_core
 issue_tracker: https://github.com/zharp-io/zharp-dart-lib/issues

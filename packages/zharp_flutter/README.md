@@ -155,6 +155,32 @@ its header (`build_id`, `os`/`arch`, `isolate_dso_base`), and adds `zharp.dart_b
 `zharp.dart_os` and `zharp.dart_arch` to the error. Names of your own error classes are obfuscated
 too (`exception.type` may read like `a5`); the frames are what the symbols restore.
 
+## Flutter web
+
+The same package works on the web. Wrap `main` in `Zharp.guard`: in a browser, an uncaught
+error from a timer, a future or an event handler reaches Zharp only through the zone.
+
+```dart
+void main() => Zharp.guard(() async {
+      await Zharp.init(ZharpOptions(key: 'zpk_…', service: 'shop-web'));
+      runApp(const MyApp());
+    });
+```
+
+A release build is minified JavaScript. Build it with source maps and upload them, and Zharp
+shows (and groups) its errors by your Dart files and lines:
+
+```bash
+flutter build web --release --source-maps
+npx @zharp/cli sourcemaps inject build/web
+npx @zharp/cli sourcemaps upload build/web --app <application id> --delete-after
+```
+
+`inject` writes a debug ID into `main.dart.js` (deploy that file, not an earlier copy); `upload`
+sends it with its map; `--delete-after` removes the `.map` so it isn't served. The same
+`ZHARP_AUTH_TOKEN` as above. Error types read as you'd expect (`StateError`, `TypeError`, or your
+class's name when its `toString()` starts with it) even though dart2js renames classes.
+
 ## Options
 
 | Option | Default | |

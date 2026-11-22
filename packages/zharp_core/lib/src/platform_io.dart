@@ -197,3 +197,6 @@ class _ChunkSink extends StringConversionSinkBase {
   @override
   void close() {}
 }
+
+/// Debug IDs only exist for JavaScript builds (the web).
+Map<String, Object> debugIdAttributes(String stack) => const {};
