@@ -1,6 +1,6 @@
 ## 0.3.0 - 2026-11-17
 
-## 0.4.1 - unreleased
+## 0.4.1 - 2026-11-22
 
 - Flutter web is a declared platform. Wrap `main` in `Zharp.guard` there: on the web, uncaught async errors only reach Zharp through the zone.
 - Release web builds: readable Dart stacks with `flutter build web --source-maps`, then `npx @zharp/cli sourcemaps inject build/web` and `sourcemaps upload build/web --app <id>`.

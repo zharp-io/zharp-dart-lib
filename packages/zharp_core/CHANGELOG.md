@@ -1,8 +1,8 @@
 ## 0.3.0 - 2026-11-17
 
-## 0.4.1 - unreleased
+## 0.4.1 - 2026-11-22
 
-- Flutter web: errors from release (dart2js) builds are named by what they are (`StateError`, `TypeError`, …) instead of a minified class name like `minified:dn`.
+- Flutter web: errors from release (dart2js) builds are named by what they are (`StateError`, `TypeError`, â€¦) instead of a minified class name like `minified:dn`.
 - Flutter web: errors carry the debug IDs of the `.js` files in their stack, so a build injected and uploaded with `zharp sourcemaps upload build/web` shows Dart file names and lines.
 
 ## 0.4.0 - 2026-11-21
