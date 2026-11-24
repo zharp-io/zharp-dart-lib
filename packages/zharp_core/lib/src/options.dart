@@ -5,10 +5,11 @@ import 'bodies.dart';
 /// Where telemetry goes unless `endpoint` says otherwise.
 const String defaultEndpoint = 'https://api.zharp.io/api/v1/otlp';
 
-/// How Zharp is set up. Only [key] is required.
+/// How Zharp is set up. Only [key] is required — on a Dart server or tool it can come from
+/// `ZHARP_KEY` in the environment instead.
 class ZharpOptions {
   const ZharpOptions({
-    required this.key,
+    this.key = '',
     this.service,
     this.environment,
     this.release,
@@ -34,22 +35,25 @@ class ZharpOptions {
     this.captureOutput = true,
     this.logs,
     this.logCorrelation,
+    this.captureSourceContext = true,
   });
 
   /// The app's key from the Zharp dashboard, `zpk_…`. It can only send, so it is safe to ship in
-  /// an app.
+  /// an app. Left empty on a Dart server or tool (dart:io): `ZHARP_KEY` from the environment.
   final String key;
 
-  /// `service.name`, e.g. `shop-app`.
+  /// `service.name`, e.g. `shop-app`. Unset on dart:io: `ZHARP_SERVICE`.
   final String? service;
 
-  /// `deployment.environment.name`, e.g. `production`.
+  /// `deployment.environment.name`, e.g. `production`. Unset on dart:io: `ZHARP_ENVIRONMENT`.
   final String? environment;
 
   /// `service.version`, e.g. `shop-app@2.3.0+41`. Errors and traces are filtered by it.
+  /// Unset on dart:io: `ZHARP_RELEASE`.
   final String? release;
 
-  /// Leave unset: the SDK sends straight to Zharp. (Used for Zharp's own testing.)
+  /// Leave unset: the SDK sends straight to Zharp. (Used for Zharp's own testing; `ZHARP_ENDPOINT` on
+  /// dart:io.)
   final String? endpoint;
 
   /// False is logs-only mode: logs, errors (uncaught and `captureError`), the user, session,
@@ -150,6 +154,13 @@ class ZharpOptions {
   /// `SEVERE`, the `logger` package's `[E]` or emoji), else info — warning on `stderr`. What is
   /// printed is unchanged, and a line is never sent twice.
   final bool captureOutput;
+
+  /// Dart servers and tools run from source (`dart run`): each error carries the lines around
+  /// its frames in the app's own code — not the SDK's, not pub packages' — read where the app
+  /// runs, so Zharp shows exactly the code that ran. A compiled executable has no source beside
+  /// it and sends none. On by default; `false` (or `ZHARP_CAPTURE_SOURCE_CONTEXT=false`) turns it
+  /// off.
+  final bool captureSourceContext;
 
   /// The client telemetry is sent with; one is made when not given. Not the client your app's
   /// requests are traced on — see `ZharpHttpClient`.

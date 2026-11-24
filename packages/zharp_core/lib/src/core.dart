@@ -63,19 +63,27 @@ class ZharpCore {
       if (options.debug) _print('Disabled by ZharpOptions.enabled — nothing will be sent');
       return null;
     }
-    final key = options.key.trim();
+    // A Dart server or tool is configured from its environment: ZHARP_KEY and the rest fill in
+    // what the options leave unset (dart:io only; the web and Flutter apps have no environment).
+    final key = _nonBlank(options.key) ?? environmentValue('ZHARP_KEY') ?? '';
     if (key.isEmpty) {
       _print('No key passed to Zharp.init — nothing will be sent. Copy it from the app\'s Setup page.');
       return null;
     }
+    final service = _nonBlank(options.service) ?? environmentValue('ZHARP_SERVICE');
+    final environment = _nonBlank(options.environment) ?? environmentValue('ZHARP_ENVIRONMENT');
+    final release = _nonBlank(options.release) ?? environmentValue('ZHARP_RELEASE') ?? _nonBlank(defaultRelease);
+    final endpoint = _nonBlank(options.endpoint) ?? environmentValue('ZHARP_ENDPOINT');
+    sourceContextEnabled = options.captureSourceContext &&
+        switchOn(null, 'ZHARP_CAPTURE_SOURCE_CONTEXT', const String.fromEnvironment('ZHARP_CAPTURE_SOURCE_CONTEXT'),
+            fallback: true);
 
     final resource = <String, Object>{
       ...platformAttributes(),
       ...sanitizeAttributes(resourceAttributes),
-      'service.name': _nonBlank(options.service) ?? 'unknown_service:dart',
-      if ((_nonBlank(options.release) ?? _nonBlank(defaultRelease)) != null)
-        'service.version': (_nonBlank(options.release) ?? _nonBlank(defaultRelease))!,
-      if (_nonBlank(options.environment) != null) 'deployment.environment.name': _nonBlank(options.environment)!,
+      'service.name': service ?? 'unknown_service:dart',
+      if (release != null) 'service.version': release,
+      if (environment != null) 'deployment.environment.name': environment,
       'telemetry.sdk.name': 'zharp',
       'telemetry.sdk.language': 'dart',
       'telemetry.sdk.version': sdkVersion,
@@ -84,7 +92,7 @@ class ZharpCore {
     final ownsClient = options.httpClient == null;
     final exporter = Exporter(
       key: key,
-      endpoint: normalizeEndpoint(options.endpoint),
+      endpoint: normalizeEndpoint(endpoint),
       client: options.httpClient ?? createHttpClient(),
       resource: resource,
       flushInterval: options.flushInterval,
@@ -143,7 +151,7 @@ class ZharpCore {
   /// Run [body] — a Dart server or command-line tool — where every line printed (`print`,
   /// `stdout`, `stderr`) during a span ends with its `trace_id` and `span_id`
   /// ([ZharpOptions.logCorrelation]), and, with [ZharpOptions.logs] on, is also sent as a log.
-  /// Errors and the return value are [body]'s own. Start Zharp inside it or before it:
+  /// Start Zharp inside it or before it:
   ///
   /// ```dart
   /// void main() => ZharpCore.run(() async {
@@ -151,7 +159,31 @@ class ZharpCore {
   ///   await serve();
   /// });
   /// ```
-  static R run<R>(R Function() body) => runCapturingOutput(body);
+  ///
+  /// An error nothing catches — one that would end the program — is reported as unhandled
+  /// (fatal), and what is waiting is sent (for up to 3 seconds) before it goes on as before:
+  /// printed, and the program ends with exit code 255. Give [body] as `async`, so an error it
+  /// throws reaches Zharp too. The return value is [body]'s own.
+  static R run<R>(R Function() body) => runZoned(
+        () => runCapturingOutput(body),
+        zoneSpecification: ZoneSpecification(handleUncaughtError: _reportUncaught),
+      );
+
+  static void _reportUncaught(Zone self, ZoneDelegate parent, Zone zone, Object error, StackTrace stack) {
+    final core = _instance;
+    if (core == null || core._closed) {
+      parent.handleUncaughtError(zone, error, stack);
+      return;
+    }
+    // Reported already when a span it escaped from recorded it: then only sent.
+    if (core.options.captureErrors && !wasReported(error)) {
+      core.captureError(error, stackTrace: stack, handled: false, severity: Severity.fatal);
+    }
+    // The VM ends the program once the error reaches the root zone: send what's waiting first.
+    core.flush().timeout(const Duration(seconds: 3), onTimeout: () {}).whenComplete(
+          () => parent.handleUncaughtError(zone, error, stack),
+        );
+  }
 
   ZharpUser? _user;
   final Map<String, Object> _tags = {};

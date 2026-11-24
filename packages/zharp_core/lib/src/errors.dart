@@ -4,6 +4,10 @@ library;
 import 'dart:async' show TimeoutException;
 
 import 'platform.dart' show debugIdAttributes;
+import 'source.dart' show inAppAttributes, sourceContextAttributes;
+
+/// Whether errors carry the code around their frames ([ZharpOptions.captureSourceContext]).
+bool sourceContextEnabled = true;
 
 /// Frames from the SDK itself, left out of stacks the SDK had to capture on the caller's behalf.
 final RegExp _sdkFrame = RegExp(r'package:zharp_(core|flutter|dio)/');
@@ -80,6 +84,9 @@ class ExceptionDescription {
         'zharp.handled': handled ? 'true' : 'false',
         ...?build?.attributes(),
         ...debugIdAttributes(stacktrace),
+        // A symbolic stack (not an obfuscated build's addresses): the app's code and packages.
+        if (build == null) ...inAppAttributes(),
+        if (build == null && sourceContextEnabled) ...sourceContextAttributes(stacktrace),
       };
 }
 

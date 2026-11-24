@@ -1,3 +1,9 @@
+## Unreleased
+
+- Dart servers and tools: `ZharpCore.run` reports an error nothing catches as fatal and sends what is waiting before the program ends (as before: printed, exit code 255). An error already recorded on a span is sent, not reported again.
+- Errors carry the code that ran (`zharp.source_context`) when the program runs from source, and the app's own packages (`zharp.in_app`), so Zharp tells the app's frames from shelf's and pub packages'. `captureSourceContext` / `ZHARP_CAPTURE_SOURCE_CONTEXT=false` turns the code off.
+- On dart:io, `ZHARP_KEY`, `ZHARP_SERVICE`, `ZHARP_ENVIRONMENT`, `ZHARP_RELEASE` and `ZHARP_ENDPOINT` fill in what the options leave unset; `key` is now optional.
+
 ## 0.3.0 - 2026-11-17
 
 ## 0.4.1 - 2026-11-22
