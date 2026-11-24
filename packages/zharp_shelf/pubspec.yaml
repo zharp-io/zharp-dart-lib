@@ -1,6 +1,6 @@
 name: zharp_shelf
 description: Traces shelf (and dart_frog) servers for Zharp Application Monitoring — a SERVER span per request that continues the caller's trace, with the request's ids on every line it prints.
-version: 0.1.1
+version: 0.1.2
 homepage: https://zharp.io
 repository: https://github.com/zharp-io/zharp-dart-lib/tree/main/packages/zharp_shelf
 issue_tracker: https://github.com/zharp-io/zharp-dart-lib/issues
@@ -11,7 +11,7 @@ environment:
 
 dependencies:
   shelf: ^1.4.0
-  zharp_core: ^0.4.0
+  zharp_core: ^0.5.0
 
 dev_dependencies:
   http: ^1.2.0
