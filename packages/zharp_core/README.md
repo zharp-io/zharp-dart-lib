@@ -57,6 +57,27 @@ requests (`ZharpHttpClient`, `zharp_dio`, which pass the trace on) and `setUser`
 that request's user, not the process's — all belong to the request. Request bodies aren't
 captured (`captureBodies` covers outgoing requests only).
 
+### Errors in Dart servers and tools
+
+Run `main` inside `ZharpCore.run` with an `async` function. An error nothing catches — one that
+would end the program — is reported as unhandled (fatal), and what is waiting is sent (for up to 3
+seconds) before it goes on as before: printed, exit code 255. An error that escaped a span or a
+request is sent on it, once. `exit()` ends the program at once: `await ZharpCore.instance?.close()`
+first.
+
+Run from source (`dart run`), each error carries the code that ran: five lines either side of its
+innermost five frames in the app's own code (`zharp.source_context`), never the SDK's or pub
+packages'. It also names the app's packages (`zharp.in_app`: the root package and local path
+packages from `.dart_tool/package_config.json`), so Zharp tells `package:shop/…` frames from
+`package:shelf/…` ones. A compiled executable has neither file beside it, and sends neither.
+`captureSourceContext: false` (or `ZHARP_CAPTURE_SOURCE_CONTEXT=false`) turns the code off.
+
+### From the environment
+
+On dart:io, `ZHARP_KEY`, `ZHARP_SERVICE`, `ZHARP_ENVIRONMENT`, `ZHARP_RELEASE` and `ZHARP_ENDPOINT`
+fill in what `ZharpOptions` leaves unset, so `ZharpCore.start(const ZharpOptions())` is enough on
+a configured server.
+
 ### Logs on a server
 
 Wrap the program in `ZharpCore.run`, as above (`zharpHandler` and `zharpMiddleware` also do it
